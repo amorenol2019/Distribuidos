@@ -17,15 +17,15 @@ Práctica 1. Ejercicio 1. Cliente Simple
 
 int client_socket = 0;
 
-sighandler_t ctrlHandler(void) {
-    if (close(client_socket) < 0) {
-        error("Client not correctly closed...\n");
-    }
-}
-
 void error(char *msg) {
     printf("%s", msg);
     exit(FAIL);
+}
+
+void ctrlHandler(int num) {
+    if (close(client_socket) < 0) {
+        error("Client not correctly closed...\n");
+    }
 }
 
 int main(int argc, char *argv[]) {
