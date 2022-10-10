@@ -8,7 +8,7 @@ Práctica 1. Ejercicio 1. Servidor Simple
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/select.h>

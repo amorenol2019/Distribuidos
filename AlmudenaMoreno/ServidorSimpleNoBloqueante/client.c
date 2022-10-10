@@ -8,7 +8,7 @@ Práctica 1. Ejercicio 1. Cliente Simple
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 
 #define MAX 256
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in servaddr;
     explicit_bzero(&servaddr, sizeof(servaddr));  //Erase data if necessary 
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
+    servaddr.sin_addr.s_addr = inet_addr("212.128.254.3");   //Any interface
     servaddr.sin_port = htons(PORT); 
     socklen_t len = sizeof(servaddr);
     if (connect(client_socket, (struct sockaddr *)&servaddr, len) == -1) {
