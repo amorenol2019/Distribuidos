@@ -7,25 +7,40 @@ Práctica 1. Ejercicio 1. Cliente Simple
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
 #define MAX 256
 #define PORT 8080
+#define FAIL 1
+
+int client_socket = 0;
+
+void error(char *msg) {
+    printf("%s", msg);
+    exit(FAIL);
+}
+
+void ctrlHandler(int num) {
+    if (close(client_socket) == -1) {
+        error("Client not correctly closed...\n");
+    }
+}
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
-    int tcp_socket = 0, r = 0;
+    int r = 0;
+    signal(SIGINT, ctrlHandler);   //Cierra con control + c
 
     char buff[MAX];
     explicit_bzero(buff, MAX);  //Erase data if necessary 
 
     /*Create a socket and test*/
-    tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (tcp_socket == -1) {
-        printf("Socket creation failed...\n");
-        exit(1);
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket == -1) {
+        error("Socket creation failed...\n");
     } else {
         printf("Socket successfully created...\n");
     }
@@ -38,48 +53,42 @@ int main(int argc, char *argv[]) {
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
     servaddr.sin_port = htons(PORT); 
     socklen_t len = sizeof(servaddr);
-    if (connect(tcp_socket, (struct sockaddr *)&servaddr, len) == -1) {
-        printf("Server connection failed...\n");
-        exit(1);
+    if (connect(client_socket, (struct sockaddr *)&servaddr, len) == -1) {
+        error("Server connection failed...\n");
     } else { 
         printf("connected to the server...\n");
     }
 
-    /*Send message to server*/
-    printf("> ");
-    char message[MAX];
-    fgets(message, MAX, stdin);
-    send(tcp_socket, message, strlen(message), 0);
+    while(1) {
+        /*Send message to server*/
+        printf("> ");
+        char message[MAX];
+        fgets(message, MAX, stdin);
+        send(client_socket, message, strlen(message), 0);
 
-    /*Select: monitors file descriptos until readyy to I/O operations*/
-    fd_set readmask;
-    struct timeval timeout;
-    FD_ZERO(&readmask); // Reset la mascara
-    FD_SET(tcp_socket, &readmask); // Asignamos el nuevo descriptor
-    FD_SET(STDIN_FILENO, &readmask); // Entrada
-    timeout.tv_sec = 0; timeout.tv_usec = 500000; // Timeout de 0.5 seg.
-    if (select(tcp_socket + 1, &readmask, NULL, NULL, &timeout) == -1) {
-        exit(1);
-    }
-    /*Data to read from descriptor*/
-    if (FD_ISSET(tcp_socket, &readmask)) {
-        /*Receive data from a socket*/
-        r = recv(tcp_socket, (void*) buff, sizeof(buff), MSG_DONTWAIT);
-        if (r > 0) {
-            printf("+++ ");
-            if (fputs(buff, stdout) == EOF) {
-                fprintf(stderr, "[ERROR]: fputs() failed...");
-            }
-        } else if (r == -1) {
-            printf("Receive data from server failed...\n");
-            exit(1);
+        /*Select: monitors file descriptos until readyy to I/O operations*/
+        fd_set readmask;
+        struct timeval timeout;
+        FD_ZERO(&readmask); // Reset la mascara
+        FD_SET(client_socket, &readmask); // Asignamos el nuevo descriptor
+        FD_SET(STDIN_FILENO, &readmask); // Entrada
+        timeout.tv_sec = 0; timeout.tv_usec = 500000; // Timeout de 0.5 seg.
+        if (select(client_socket + 1, &readmask, NULL, NULL, &timeout) == -1) {
+            exit(FAIL);
         }
-    }
-
-    /*Socket closed*/
-    if (close(tcp_socket) < 0) {
-        printf("Client not correctly closed...\n");
-        exit(1);
+        /*Data to read from descriptor*/
+        if (FD_ISSET(client_socket, &readmask)) {
+            /*Receive data from a socket*/
+            r = recv(client_socket, (void*) buff, sizeof(buff), MSG_DONTWAIT);
+            if (r > 0) {
+                printf("+++ ");
+                if (fputs(buff, stdout) == EOF) {
+                    fprintf(stderr, "[ERROR]: fputs() failed...");
+                }
+            } else if (r == -1) {
+                error("Receive data from server failed...\n");
+            }
+        }
     }
 
     return 0;
