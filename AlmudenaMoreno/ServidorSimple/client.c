@@ -23,7 +23,7 @@ void error(char *msg) {
 }
 
 void ctrlHandler(int num) {
-    if (close(client_socket) < 0) {
+    if (close(client_socket) == -1) {
         error("Client not correctly closed...\n");
     }
 }
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in servaddr;
     explicit_bzero(&servaddr, sizeof(servaddr));  //Erase data if necessary 
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr("212.128.254.4");   //Any interface
+    servaddr.sin_addr.s_addr = inet_addr("212.128.254.3");   //Any interface
     servaddr.sin_port = htons(PORT); 
 
     /*Create a socket and test*/
