@@ -7,16 +7,32 @@ Práctica 1. Ejercicio 1. Cliente Simple
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
+#include <signal.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 
 #define MAX 256
 #define PORT 8080
+#define FAIL 1
+
+int client_socket = 0;
+
+sighandler_t ctrlHandler(void) {
+    if (close(client_socket) < 0) {
+        error("Client not correctly closed...\n");
+    }
+}
+
+void error(char *msg) {
+    printf("%s", msg);
+    exit(FAIL);
+}
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
-    int tcp_socket = 0, r = 0;
+    int r = 0, run = 1;
+    signal(SIGINT, ctrlHandler);   //Cierra con control + c
 
     char buff[MAX];
     explicit_bzero(buff, MAX);  //Erase data if necessary 
@@ -25,46 +41,44 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in servaddr;
     explicit_bzero(&servaddr, sizeof(servaddr));  //Erase data if necessary 
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
+    servaddr.sin_addr.s_addr = inet_addr("212.128.254.4");   //Any interface
     servaddr.sin_port = htons(PORT); 
 
     /*Create a socket and test*/
-    tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (tcp_socket == -1) {
-        printf("Socket creation failed...\n");
-        exit(1);
+    client_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_socket == -1) {
+        error("Socket creation failed...\n");
     } else {
         printf("Socket successfully created...\n");
     }
 
     /*Server is waiting for clients*/
     socklen_t len = sizeof(servaddr);
-    if (connect(tcp_socket, (struct sockaddr *)&servaddr, len) == -1) {
-        printf("Server connection failed...\n");
-        exit(1);
+    if (connect(client_socket, (struct sockaddr *)&servaddr, len) == -1) {
+        error("Server connection failed...\n");
     } else { 
         printf("connected to the server...\n");
     }
 
-    /*Send message to server*/
-    printf("> ");
-    char message[MAX];
-    fgets(message, MAX, stdin);
-    send(tcp_socket, message, strlen(message), 0);
+    while (1) {
+        /*Send message to server*/
+        printf("> ");
+        char message[MAX];
+        fgets(message, MAX, stdin);
+        send(client_socket, message, strlen(message), 0);
 
-    /*Receive data from a socket*/
-    r = recv(tcp_socket, (void*) buff, sizeof(buff), 0);
-    if (r > 0) {
-        printf("+++ ");
-        if (fputs(buff, stdout) == EOF) {
-            fprintf(stderr, "[ERROR]: fputs() failed...");
+        /*Receive data from a socket*/
+        r = recv(client_socket, (void*) buff, sizeof(buff), 0);
+        if (r > 0) {
+            printf("+++ ");
+            if (fputs(buff, stdout) == EOF) {
+                error("[ERROR]: fputs() failed...\n");
+            }
         }
-    }
 
-    /*Socket closed*/
-    if (close(tcp_socket) < 0) {
-        printf("Client not correctly closed...\n");
-        exit(1);
+        /*Socket closed
+        
+        */
     }
 
     return 0;
