@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         /*Data to read from descriptor*/
         if (FD_ISSET(connfd, &readmask)) {
             /*Receive data from a socket*/
-            r = recv(connfd, (void*) buff, sizeof(buff), MSG_DONTWAIT);
+            r = recv(connfd, (void*) buff, sizeof(buff), 0);
             if (r > 0) {
                 printf("+++ ");
                 if (fputs(buff, stdout) == EOF) {

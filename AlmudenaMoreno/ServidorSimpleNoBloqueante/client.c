@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
         /*Data to read from descriptor*/
         if (FD_ISSET(client_socket, &readmask)) {
             /*Receive data from a socket*/
-            r = recv(client_socket, (void*) buff, sizeof(buff), MSG_DONTWAIT);
+            r = recv(client_socket, (void*) buff, sizeof(buff), 0);
             if (r > 0) {
                 printf("+++ ");
                 if (fputs(buff, stdout) == EOF) {
