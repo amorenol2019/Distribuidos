@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     bzero(buff, MAX); //Erase data if necessary 
 
     fd_set readmask;
-    //struct timeval timeout;
+    struct timeval timeout;
 
     /*Create a socket and test*/
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -95,7 +95,8 @@ int main(int argc, char *argv[]) {
         FD_SET(connfd, &readmask); // Asignamos el nuevo descriptor
         FD_SET(STDIN_FILENO, &readmask); // Entrada
         //NULL Timeout - undefined waiting time
-        if (select(connfd + 1, &readmask, NULL, NULL, NULL) == -1) {
+        timeout.tv_sec = 0; timeout.tv_usec = 0; // Timeout de 0.5 seg.
+        if (select(connfd + 1, &readmask, NULL, NULL, &timeout) == -1) {
             exit(FAIL);
         }
         /*Data to read from descriptor*/
