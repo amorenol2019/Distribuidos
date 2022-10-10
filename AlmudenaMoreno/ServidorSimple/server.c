@@ -17,15 +17,25 @@ Práctica 1. Ejercicio 1. Servidor Simple
 #define NCLIENTS 1
 #define FAIL 1
 
+int tcp_socket = 0;
+
 void error(char *msg) {
     printf("%s", msg);
     exit(FAIL);
 }
 
+void ctrlHandler(int num) {
+    if (close(tcp_socket) == -1) {
+        error("Server not correctly closed...\n");
+    }
+}
+
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
     const int enable = 1;
-    int tcp_socket = 0, list = 0, connfd = 0, res = 0, r = 0;
+    int list = 0, connfd = 0, res = 0, r = 0;
+
+    signal(SIGINT, ctrlHandler);   //Cierra con control + c
 
     char buff[MAX];
     bzero(buff, MAX); //Erase data if necessary 
@@ -93,13 +103,6 @@ int main(int argc, char *argv[]) {
         char message[MAX];
         fgets(message, MAX, stdin);
         send(connfd, message, strlen(message), 0);
-
-        /*
-        Socket closed
-        if (close(tcp_socket) < 0) {
-            error("Server not correctly closed...\n");
-        }
-        */
     }
 
     return 0;

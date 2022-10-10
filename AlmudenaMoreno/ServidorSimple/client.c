@@ -31,7 +31,7 @@ void ctrlHandler(int num) {
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
-    int r = 0, run = 1;
+    int r = 0;
     signal(SIGINT, ctrlHandler);   //Cierra con control + c
 
     char buff[MAX];
