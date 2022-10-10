@@ -24,7 +24,7 @@ void error(char *msg) {
 
 void ctrlHandler(int num) {
     if (close(client_socket) == -1) {
-        error("Client not correctly closed...\n");
+        error("\nClient not correctly closed...\n");
     }
 }
 
@@ -36,6 +36,8 @@ int main(int argc, char *argv[]) {
 
     char buff[MAX];
     explicit_bzero(buff, MAX);  //Erase data if necessary 
+    fd_set readmask;
+    struct timeval timeout;
 
     /*Create a socket and test*/
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -67,8 +69,6 @@ int main(int argc, char *argv[]) {
         send(client_socket, message, strlen(message), 0);
 
         /*Select: monitors file descriptos until readyy to I/O operations*/
-        fd_set readmask;
-        struct timeval timeout;
         FD_ZERO(&readmask); // Reset la mascara
         FD_SET(client_socket, &readmask); // Asignamos el nuevo descriptor
         FD_SET(STDIN_FILENO, &readmask); // Entrada

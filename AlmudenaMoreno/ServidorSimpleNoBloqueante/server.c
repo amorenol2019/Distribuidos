@@ -27,7 +27,7 @@ void error(char *msg) {
 
 void ctrlHandler(int num) {
     if (close(tcp_socket) == -1) {
-        error("Server not correctly closed...\n");
+        error("\nServer not correctly closed...\n");
     }
 }
 
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
         FD_SET(STDIN_FILENO, &readmask); // Entrada
         //NULL Timeout - undefined waiting time
         if (select(connfd + 1, &readmask, NULL, NULL, NULL) == -1) {
-            exit(1);
+            exit(FAIL);
         }
         /*Data to read from descriptor*/
         if (FD_ISSET(connfd, &readmask)) {
