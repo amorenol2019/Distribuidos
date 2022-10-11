@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     if (connect(client_socket, (struct sockaddr *)&servaddr, len) == -1) {
         error("Server connection failed...\n");
     } else { 
-        printf("HOLA connected to the server...\n");
+        printf("connected to the server...\n");
     }
 
     while(1) {
