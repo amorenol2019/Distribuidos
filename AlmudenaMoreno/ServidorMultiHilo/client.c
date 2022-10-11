@@ -1,7 +1,7 @@
 /*
 Almudena Moreno Lopez
 Sistemas Distribuidos y Concurrentes
-Práctica 1. Ejercicio 2. Cliente Simple No Bloqueante
+Práctica 1. Ejercicio 3. Cliente Multi Hilo
 */
 
 #include <stdio.h>
@@ -12,7 +12,6 @@ Práctica 1. Ejercicio 2. Cliente Simple No Bloqueante
 #include <unistd.h>
 
 #define MAX 1024
-#define PORT 8080
 #define FAIL 1
 
 int client_socket = 0;
@@ -29,6 +28,15 @@ void ctrlHandler(int num) {
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
+
+    //Numero de argumentos incluyendo el nombre del programa
+    if(argc != 3) {
+        printf("Incorrect program call.\n Usage: ./server PORT");
+        exit(1);
+    }
+    char *ip_dir = argv[1];
+    int port = atoi(argv[2]);
+
 
     int r = 0;
     struct sockaddr_in sock_serv;
@@ -53,8 +61,10 @@ int main(int argc, char *argv[]) {
 
     /*Create IP direction and port*/
     sock_serv.sin_family = AF_INET;
-    sock_serv.sin_addr.s_addr = inet_addr("127.0.0.1");//"212.128.254.23");   //Any interface
-    sock_serv.sin_port = htons(PORT); 
+    sock_serv.sin_addr.s_addr = inet_addr(ip_dir); //"212.128.254.23");   //Any interface
+    sock_serv.sin_port = htons(port); 
+
+    printf("%d", port);
 
     /*Server is waiting for clients*/
     len = sizeof(sock_serv);

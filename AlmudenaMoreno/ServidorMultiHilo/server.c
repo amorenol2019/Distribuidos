@@ -1,7 +1,7 @@
 /*
 Almudena Moreno Lopez
 Sistemas Distribuidos y Concurrentes
-Práctica 1. Ejercicio 1. Servidor Simple
+Práctica 1. Ejercicio 3. Servidor Multi Hilo
 */
 
 #include <stdio.h>
@@ -11,9 +11,9 @@ Práctica 1. Ejercicio 1. Servidor Simple
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 
 #define MAX 1024
-#define PORT 8080
 #define NCLIENTS 1
 #define FAIL 1
 
@@ -32,17 +32,26 @@ void ctrlHandler(int num) {
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
+    //Numero de argumentos incluyendo el nombre del programa
+    if(argc != 2) {
+        printf("Incorrect program call.\n Usage: ./server PORT");
+        exit(1);
+    }
+    int port = atoi(argv[1]);
+
     const int enable = 1;
     int connfd = 0, r = 0;
     struct sockaddr_in sock_serv;
-    bzero(&sock_serv, sizeof(sock_serv));  //Erase data
+    bzero(&sock_serv, sizeof(sock_serv)); //Erase data
     struct sockaddr_in sock_cli;
     bzero(&sock_cli, sizeof(sock_cli));
     socklen_t len;
     char buff[MAX];
-    bzero(buff, MAX); 
+    bzero(buff, MAX);
     char message[MAX];
     bzero(message, MAX);
+    fd_set readmask;
+    struct timeval timeout;
 
     signal(SIGINT, ctrlHandler);   //Close with CTRL + C
 
@@ -53,11 +62,11 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Socket successfully created...\n");
     }
-
+    
     /*Create IP direction and port*/
     sock_serv.sin_family = AF_INET;
     sock_serv.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
-    sock_serv.sin_port = htons(PORT); 
+    sock_serv.sin_port = htons(port); 
 
     /*Close socket without time wait*/
     if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
@@ -88,16 +97,29 @@ int main(int argc, char *argv[]) {
     }
 
     while(1) {
-        /*Receive data from a socket*/
-        r = recv(connfd, (void*) buff, sizeof(buff), 0);
-        if (r == -1) {
-            error("Receive data from client failed...\n");
-        } else if (r > 0) {
-            printf("+++ ");
-            if (fputs(buff, stdout) == EOF) {
-                error("[ERROR]: fputs() failed...\n");
+        /*Select: monitors file descriptos until readyy to I/O operations*/
+        FD_ZERO(&readmask); // Reset la mascara
+        FD_SET(connfd, &readmask); // Asignamos el nuevo descriptor
+        FD_SET(STDIN_FILENO, &readmask); // Entrada
+        //NULL Timeout - undefined waiting time
+        timeout.tv_sec = 0; timeout.tv_usec = 0; // Timeout de 0.5 seg.
+        if (select(connfd + 1, &readmask, NULL, NULL, &timeout) == -1) {
+            exit(FAIL);
+        }
+        /*Data to read from descriptor*/
+        if (FD_ISSET(connfd, &readmask)) {
+            /*Receive data from a socket*/
+            r = recv(connfd, (void*) buff, sizeof(buff), 0);
+            if (r == -1) {
+                error("Receive data from client failed...\n");
+            } else if (r > 0) {
+                printf("+++ ");
+                if (fputs(buff, stdout) == EOF) {
+                    error("[ERROR]: fputs() failed...\n");
+                }
             }
         }
+        
         /*PARA QUE HAY QUE UTILIZAR SCANF*/
         /*Get message to client*/
         printf("> ");

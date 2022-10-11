@@ -1,7 +1,7 @@
 /*
 Almudena Moreno Lopez
 Sistemas Distribuidos y Concurrentes
-Práctica 1. Ejercicio 1. Servidor Simple
+Práctica 1. Ejercicio 2. Servidor Simple No Bloqueante
 */
 
 #include <stdio.h>
@@ -13,7 +13,7 @@ Práctica 1. Ejercicio 1. Servidor Simple
 #include <sys/socket.h>
 #include <sys/select.h>
 
-#define MAX 256
+#define MAX 1024
 #define PORT 8080
 #define NCLIENTS 1
 #define FAIL 1
@@ -22,27 +22,32 @@ int tcp_socket = 0;
 
 void error(char *msg) {
     printf("%s", msg);
+    close(tcp_socket);
     exit(FAIL);
 }
 
 void ctrlHandler(int num) {
-    if (close(tcp_socket) == -1) {
-        error("\nServer not correctly closed...\n");
-    }
+    close(tcp_socket);
 }
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
+
     const int enable = 1;
-    int list = 0, connfd = 0, res = 0, r = 0;
-
-    signal(SIGINT, ctrlHandler);   //Cierra con control + c
-
+    int connfd = 0, r = 0;
+    struct sockaddr_in sock_serv;
+    bzero(&sock_serv, sizeof(sock_serv)); //Erase data
+    struct sockaddr_in sock_cli;
+    bzero(&sock_cli, sizeof(sock_cli));
+    socklen_t len;
     char buff[MAX];
-    bzero(buff, MAX); //Erase data if necessary 
-
+    bzero(buff, MAX);
+    char message[MAX];
+    bzero(message, MAX);
     fd_set readmask;
     struct timeval timeout;
+
+    signal(SIGINT, ctrlHandler);   //Close with CTRL + C
 
     /*Create a socket and test*/
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -53,35 +58,31 @@ int main(int argc, char *argv[]) {
     }
 
     /*Create IP direction and port*/
-    struct sockaddr_in servaddr;
-    explicit_bzero(&servaddr, sizeof(servaddr));  //Erase data if necessary 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
-    servaddr.sin_port = htons(PORT); 
+    sock_serv.sin_family = AF_INET;
+    sock_serv.sin_addr.s_addr = htonl(INADDR_ANY);   //Any interface
+    sock_serv.sin_port = htons(PORT); 
 
-    /*Reuse ports*/
+    /*Close socket without time wait*/
     if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         error("setsockopt(SO_REUSEADDR) failed");
     }
+
     /*Assign specific direction to the socket and test*/
-    res = bind(tcp_socket, (struct sockaddr *) &servaddr, sizeof(servaddr));
-    if (res == -1) {
+    if (bind(tcp_socket, (struct sockaddr *) &sock_serv, sizeof(sock_serv)) == -1) {
         error("Socket bind failed...\n");
     } else {
         printf("Socket successfully binded...\n");
     }
     
     /*Server listening*/
-    list = listen(tcp_socket, NCLIENTS);
-    if (list == -1) {
+    if (listen(tcp_socket, NCLIENTS) == -1) {
         error("Listening failed...\n");
     } else {
         printf("Server listening...\n");
     }
 
     /*First conection from stack, create a new socket for client*/
-    struct sockaddr_in sock_cli;
-    socklen_t len = sizeof(sock_cli);
+    len = sizeof(sock_cli);
 
     /*Server is waiting for clients*/
     connfd = accept(tcp_socket,(struct sockaddr *)&sock_cli, &len);
@@ -103,20 +104,19 @@ int main(int argc, char *argv[]) {
         if (FD_ISSET(connfd, &readmask)) {
             /*Receive data from a socket*/
             r = recv(connfd, (void*) buff, sizeof(buff), 0);
-            if (r > 0) {
+            if (r == -1) {
+                error("Receive data from client failed...\n");
+            } else if (r > 0) {
                 printf("+++ ");
                 if (fputs(buff, stdout) == EOF) {
                     error("[ERROR]: fputs() failed...\n");
                 }
-            } else if (r == -1) {
-                error("Receive data from client failed...\n");
             }
         }
         
         /*PARA QUE HAY QUE UTILIZAR SCANF*/
         /*Get message to client*/
         printf("> ");
-        char message[MAX];
         fgets(message, MAX, stdin);
         send(connfd, message, strlen(message), 0);
     }
