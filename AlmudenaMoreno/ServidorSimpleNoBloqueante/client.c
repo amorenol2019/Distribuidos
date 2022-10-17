@@ -25,6 +25,7 @@ void error(char *msg) {
 
 void ctrlHandler(int num) {
     close(client_socket);
+    exit(FAIL);
 }
 
 int main(int argc, char *argv[]) {

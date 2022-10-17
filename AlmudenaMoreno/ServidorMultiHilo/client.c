@@ -24,21 +24,22 @@ void error(char *msg) {
 
 void ctrlHandler(int num) {
     close(client_socket);
+    exit(0);
 }
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
     //Numero de argumentos incluyendo el nombre del programa
-    if(argc != 3) {
-        printf("Incorrect program call.\n Usage: ./server PORT");
+    if(argc != 4) {
+        printf("Incorrect program call.\n Usage: ./client IP_DIRECTION PORT");
         exit(1);
     }
-    char *ip_dir = argv[1];
-    int port = atoi(argv[2]);
+    int ID_CLIENT = atoi(argv[1]);
+    char *ip_dir = argv[2];
+    int port = atoi(argv[3]);
 
-
-    int r = 0;
+    int connfd = 0, r = 0;
     struct sockaddr_in sock_serv;
     bzero(&sock_serv, sizeof(sock_serv));  //Erase data
     socklen_t len;
@@ -64,8 +65,6 @@ int main(int argc, char *argv[]) {
     sock_serv.sin_addr.s_addr = inet_addr(ip_dir); //"212.128.254.23");   //Any interface
     sock_serv.sin_port = htons(port); 
 
-    printf("%d", port);
-
     /*Server is waiting for clients*/
     len = sizeof(sock_serv);
     if (connect(client_socket, (struct sockaddr *)&sock_serv, len) == -1) {
@@ -74,34 +73,36 @@ int main(int argc, char *argv[]) {
         printf("connected to the server...\n");
     }
 
-    while(1) {
-        /*Send message to server*/
-        printf("> ");
-        fgets(message, MAX, stdin);
-        send(client_socket, message, strlen(message), 0);
+    /*Send message to server*/
+    printf("> ");
+    snprintf(message, MAX, "Hello server! From client: %d\n" , ID_CLIENT);
+    printf("%s", message);
+    send(client_socket, message, strlen(message), 0);
 
-        /*Select: monitors file descriptos until readyy to I/O operations*/
-        FD_ZERO(&readmask); // Reset la mascara
-        FD_SET(client_socket, &readmask); // Asignamos el nuevo descriptor
-        FD_SET(STDIN_FILENO, &readmask); // Entrada
-        timeout.tv_sec = 0; timeout.tv_usec = 500000; // Timeout de 0.5 seg.
-        if (select(client_socket + 1, &readmask, NULL, NULL, &timeout) == -1) {
-            exit(FAIL);
-        }
-        /*Data to read from descriptor*/
-        if (FD_ISSET(client_socket, &readmask)) {
-            /*Receive data from a socket*/
-            r = recv(client_socket, (void*) buff, sizeof(buff), 0);
-            if (r > 0) {
-                printf("+++ ");
-                if (fputs(buff, stdout) == EOF) {
-                    fprintf(stderr, "[ERROR]: fputs() failed...");
-                }
-            } else if (r == -1) {
-                error("Receive data from server failed...\n");
-            }
-        }
+    //*Select: monitors file descriptos until readyy to I/O operations*/
+    FD_ZERO(&readmask); // Reset la mascara
+    FD_SET(connfd, &readmask); // Asignamos el nuevo descriptor
+    FD_SET(STDIN_FILENO, &readmask); // Entrada
+    //NULL Timeout - undefined waiting time
+    timeout.tv_sec = 3; timeout.tv_usec = 500000; // Timeout de 3 seg.
+    
+    if (select(connfd + 1, &readmask, NULL, NULL, &timeout) == -1) {
+        exit(EXIT_FAILURE);
     }
+
+
+    /*Receive data from a socket*/
+    r = recv(client_socket, (void*) buff, sizeof(buff), 0);
+    if (r > 0) {
+        printf("+++ ");
+        if (fputs(buff, stdout) == EOF) {
+            fprintf(stderr, "[ERROR]: fputs() failed...");
+        }
+    } else if (r == -1) {
+        error("Receive data from server failed...\n");
+    }
+
+    ctrlHandler(0);
 
     return 0;
 }

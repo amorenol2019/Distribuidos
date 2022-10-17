@@ -21,12 +21,13 @@ int tcp_socket = 0;
 
 void error(char *msg) {
     printf("%s", msg);
-    close(tcp_socket);
+    printf("%d\n", close(tcp_socket));
     exit(FAIL);
 }
 
 void ctrlHandler(int num) {
     close(tcp_socket);
+    exit(FAIL);
 }
 
 int main(int argc, char *argv[]) {
