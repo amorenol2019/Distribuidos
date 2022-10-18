@@ -16,19 +16,17 @@ Práctica 1. Ejercicio 3. Servidor Multi Hilo
 
 #define MAX 1024
 #define NCLIENTS 100
-#define FAIL 1
 
 int tcp_socket = 0;
 
 void error(char *msg) {
-    printf("%s", msg);
-    close(tcp_socket);
-    exit(FAIL);
+    printf("%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
 void ctrlHandler(int num) {
     close(tcp_socket);
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 void *thread_client(void *arg) {
@@ -38,36 +36,43 @@ void *thread_client(void *arg) {
     struct timeval timeout;
     int connfd_ = *(int *)arg, r = 0;
     //*Select: monitors file descriptos until readyy to I/O operations*/
-    FD_ZERO(&readmask); // Reset la mascara
-    FD_SET(connfd_, &readmask); // Asignamos el nuevo descriptor
-    FD_SET(STDIN_FILENO, &readmask); // Entrada
-    timeout.tv_sec = 2; timeout.tv_usec = 500000; // Timeout de 3 seg.
+    FD_ZERO(&readmask); // Reset mask
+    FD_SET(connfd_, &readmask); // Assign new descriptor
+    FD_SET(STDIN_FILENO, &readmask); // Entry
+    timeout.tv_sec = 2; timeout.tv_usec = 500000; // Timeout de 2.5 seg.
     
     if (select(connfd_ + 1, &readmask, NULL, NULL, &timeout) == -1) {
-        printf("ERROR");
-        exit(EXIT_FAILURE);
+        close(connfd_);
+        close(tcp_socket);
+        error("Error in select...");
     }
 
     if (FD_ISSET(connfd_, &readmask)) {
         /*Receive data from a socket*/
         r = recv(connfd_, (void*) buff, sizeof(buff), 0);
         if (r == -1) {
-            error("Receive data from client failed...\n");
+            close(connfd_);
+            close(tcp_socket);
+            error("Receive data from client failed...");
         }
         printf("+++ ");
         if (fputs(buff, stdout) == EOF) {
-            error("[ERROR]: fputs() failed...\n");
+            close(connfd_);
+            close(tcp_socket);
+            error("[ERROR]: fputs() failed...");
         }
     }
 
     /*Get message to client*/
-    printf("> ");
     char *message = "Hello client!\n";
-    printf("%s", message);
     if (send(connfd_, message, strlen(message), 0) == -1) {
+        close(connfd_);
+        close(tcp_socket);
         error("ERROR sending the message");
     }
+    //Test multi threads: sleep(4);
     if (close(connfd_) == -1) {
+        close(tcp_socket);
         error("Error closing socket");
     }
 
@@ -77,10 +82,8 @@ void *thread_client(void *arg) {
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
 
-    //Numero de argumentos incluyendo el nombre del programa
     if(argc != 2) {
-        printf("Incorrect program call.\n Usage: ./server PORT");
-        exit(1);
+        error("Incorrect program call.\n Usage: ./server PORT");
     }
     int port = atoi(argv[1]);
 
@@ -96,7 +99,7 @@ int main(int argc, char *argv[]) {
     /*Create a socket and test*/
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_socket == -1) {
-        error("Socket creation failed...\n");
+        error("Socket creation failed...");
     } else {
         printf("Socket successfully created...\n");
     }
@@ -108,43 +111,51 @@ int main(int argc, char *argv[]) {
 
     /*Close socket without time wait*/
     if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        close(tcp_socket);
         error("setsockopt(SO_REUSEADDR) failed");
     }
 
     /*Assign specific direction to the socket and test*/
     if (bind(tcp_socket, (struct sockaddr *) &sock_serv, sizeof(sock_serv)) == -1) {
-        error("Socket bind failed...\n");
+        close(tcp_socket);
+        error("Socket bind failed...");
     } else {
         printf("Socket successfully binded...\n");
     }
     
     /*Server listening*/
-    if (listen(tcp_socket, 100) == -1) {
-        error("Listening failed...\n");
+    if (listen(tcp_socket, 200) == -1) {
+        close(tcp_socket);
+        error("Listening failed...");
     } else {
         printf("Server listening...\n");
     }
-
-    /*First conection from stack, create a new socket for client*/
-    len = sizeof(sock_cli);
 
     while(1) {
         /*Server is waiting for clients*/
         pthread_t thread[NCLIENTS];
         int connfd[NCLIENTS];
-        for (int i = 0; i < NCLIENTS; i++) {
-            connfd[i] = accept(tcp_socket,(struct sockaddr *)&sock_cli, &len);
-            if (connfd[i] < 0) {
-                error("Failed server accept...\n");
-            }
-            if (pthread_create(&thread[i], NULL, &thread_client, &connfd[i]) == -1) {
-                error("Error creating thread\n");
-            }
-            printf("CLIENTE NUMERO: %d\n", i);
-        }
 
         for (int i = 0; i < NCLIENTS; i++) {
+            len = sizeof(sock_cli);
+            connfd[i] = accept(tcp_socket,(struct sockaddr *)&sock_cli, &len);
+            if (connfd[i] < 0) {
+                close(connfd[i]);
+                close(tcp_socket);
+                error("Failed server accept...");
+            }
+            if (pthread_create(&thread[i], NULL, &thread_client, &connfd[i]) == -1) {
+                close(connfd[i]);
+                close(tcp_socket);
+                error("Error creating thread");
+            }
+        }
+
+        //Closing threads
+        for (int i = 0; i < NCLIENTS; i++) {
             if (pthread_join(thread[i], NULL) == -1) {
+                close(connfd[i]);
+                close(tcp_socket);
                 error("Error closing thread");
             }
         }

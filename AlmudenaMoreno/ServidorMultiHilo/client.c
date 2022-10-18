@@ -1,7 +1,7 @@
 /*
 Almudena Moreno Lopez
 Sistemas Distribuidos y Concurrentes
-Práctica 1. Ejercicio 3. Cliente Multi Hilo
+Práctica 1. Ejercicio 3. Cliente MultiHilo
 */
 
 #include <stdio.h>
@@ -12,32 +12,21 @@ Práctica 1. Ejercicio 3. Cliente Multi Hilo
 #include <unistd.h>
 
 #define MAX 1024
-#define FAIL 1
 
 int client_socket = 0;
 
 void error(char *msg) {
-    printf("%s", msg);
-    close(client_socket);
-    exit(FAIL);
+    printf("%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
 void ctrlHandler(int num) {
     close(client_socket);
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
     setbuf(stdout, NULL);
-
-    //Numero de argumentos incluyendo el nombre del programa
-    if(argc != 4) {
-        printf("Incorrect program call.\n Usage: ./client IP_DIRECTION PORT");
-        exit(1);
-    }
-    int ID_CLIENT = atoi(argv[1]);
-    char *ip_dir = argv[2];
-    int port = atoi(argv[3]);
 
     int connfd = 0, r = 0;
     struct sockaddr_in sock_serv;
@@ -50,59 +39,64 @@ int main(int argc, char *argv[]) {
     fd_set readmask;
     struct timeval timeout;
 
-    signal(SIGINT, ctrlHandler);   //Close with CTRL + C
+    if(argc != 4) {
+        error("Incorrect program call.\n Usage: ./client ID_CLIENT IP_DIRECTION PORT");
+    }
+    int ID_CLIENT = atoi(argv[1]);
+    char *ip_dir = argv[2];
+    int port = atoi(argv[3]);
+
+    signal(SIGINT, ctrlHandler); //Close with CTRL + C
 
     /*Create a socket and test*/
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (client_socket == -1) {
-        error("Socket creation failed...\n");
+        error("Socket creation failed...");
     } else {
         printf("Socket successfully created...\n");
     }
 
     /*Create IP direction and port*/
     sock_serv.sin_family = AF_INET;
-    sock_serv.sin_addr.s_addr = inet_addr(ip_dir); //"212.128.254.23");   //Any interface
+    sock_serv.sin_addr.s_addr = inet_addr(ip_dir);
     sock_serv.sin_port = htons(port); 
 
     /*Server is waiting for clients*/
     len = sizeof(sock_serv);
     if (connect(client_socket, (struct sockaddr *)&sock_serv, len) == -1) {
-        error("Server connection failed...\n");
+        close(client_socket);
+        error("Server connection failed...");
     } else { 
         printf("connected to the server...\n");
     }
 
     /*Send message to server*/
-    printf("> ");
     snprintf(message, MAX, "Hello server! From client: %d\n" , ID_CLIENT);
-    printf("%s", message);
     send(client_socket, message, strlen(message), 0);
 
     //*Select: monitors file descriptos until readyy to I/O operations*/
-    FD_ZERO(&readmask); // Reset la mascara
-    FD_SET(connfd, &readmask); // Asignamos el nuevo descriptor
-    FD_SET(STDIN_FILENO, &readmask); // Entrada
-    //NULL Timeout - undefined waiting time
-    timeout.tv_sec = 3; timeout.tv_usec = 500000; // Timeout de 3 seg.
+    FD_ZERO(&readmask); // Reset mask
+    FD_SET(connfd, &readmask); // Assign new descriptor
+    FD_SET(STDIN_FILENO, &readmask); // Entry
+    timeout.tv_sec = 2; timeout.tv_usec = 500000; // Timeout de 2.5 seg.
     
     if (select(connfd + 1, &readmask, NULL, NULL, &timeout) == -1) {
-        exit(EXIT_FAILURE);
+        close(client_socket);
+        error("Failed in select...");
     }
-
 
     /*Receive data from a socket*/
     r = recv(client_socket, (void*) buff, sizeof(buff), 0);
     if (r > 0) {
         printf("+++ ");
         if (fputs(buff, stdout) == EOF) {
+            close(client_socket);
             fprintf(stderr, "[ERROR]: fputs() failed...");
         }
     } else if (r == -1) {
-        error("Receive data from server failed...\n");
+        close(client_socket);
+        error("Receive data from server failed...");
     }
-
-    ctrlHandler(0);
 
     return 0;
 }

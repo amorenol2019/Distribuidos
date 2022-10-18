@@ -13,19 +13,18 @@ Práctica 1. Ejercicio 1. Cliente Simple
 
 #define MAX 1024
 #define PORT 8080
-#define FAIL 1
 
 int client_socket = 0;
 
 void error(char *msg) {
-    printf("%s", msg);
+    printf("%s\n", msg);
     close(client_socket);
-    exit(FAIL);
+    exit(EXIT_FAILURE);
 }
 
 void ctrlHandler(int num) {
     close(client_socket);
-    exit(FAIL);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -52,7 +51,7 @@ int main(int argc, char *argv[]) {
 
     /*Create IP direction and port*/
     sock_serv.sin_family = AF_INET;
-    sock_serv.sin_addr.s_addr = inet_addr("127.0.0.1");//"212.128.254.23");   //Any interface
+    sock_serv.sin_addr.s_addr = inet_addr("212.128.254.25");
     sock_serv.sin_port = htons(PORT); 
 
     /*Server is waiting for clients*/
@@ -72,11 +71,13 @@ int main(int argc, char *argv[]) {
         /*Receive data from a socket*/
         r = recv(client_socket, (void*) buff, sizeof(buff), 0);
         if (r == -1) {
+            close(client_socket);
             error("Receive data from client failed...\n");
         } else if (r > 0) {
             printf("+++ ");
             if (fputs(buff, stdout) == EOF) {
-                error("[ERROR]: fputs() failed...\n");
+                close(client_socket);
+                fprintf(stderr, "[ERROR]: fputs() failed...");
             }
         }
     }

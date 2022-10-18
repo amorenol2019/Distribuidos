@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
     /*Create IP direction and port*/
     sock_serv.sin_family = AF_INET;
-    sock_serv.sin_addr.s_addr = inet_addr("127.0.0.1");//"212.128.254.23");   //Any interface
+    sock_serv.sin_addr.s_addr = inet_addr("212.128.254.25");//"212.128.254.23");   //Any interface
     sock_serv.sin_port = htons(PORT); 
 
     /*Server is waiting for clients*/

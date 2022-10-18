@@ -15,19 +15,17 @@ Práctica 1. Ejercicio 1. Servidor Simple
 #define MAX 1024
 #define PORT 8080
 #define NCLIENTS 1
-#define FAIL 1
 
 int tcp_socket = 0;
 
 void error(char *msg) {
-    printf("%s", msg);
-    printf("%d\n", close(tcp_socket));
-    exit(FAIL);
+    printf("%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
 void ctrlHandler(int num) {
     close(tcp_socket);
-    exit(FAIL);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -50,7 +48,7 @@ int main(int argc, char *argv[]) {
     /*Create a socket and test*/
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_socket == -1) {
-        error("Socket creation failed...\n");
+        error("Socket creation failed...");
     } else {
         printf("Socket successfully created...\n");
     }
@@ -62,19 +60,22 @@ int main(int argc, char *argv[]) {
 
     /*Close socket without time wait*/
     if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        close(tcp_socket);
         error("setsockopt(SO_REUSEADDR) failed");
     }
 
     /*Assign specific direction to the socket and test*/
     if (bind(tcp_socket, (struct sockaddr *) &sock_serv, sizeof(sock_serv)) == -1) {
-        error("Socket bind failed...\n");
+        close(tcp_socket);
+        error("Socket bind failed...");
     } else {
         printf("Socket successfully binded...\n");
     }
     
     /*Server listening*/
     if (listen(tcp_socket, NCLIENTS) == -1) {
-        error("Listening failed...\n");
+        close(tcp_socket);
+        error("Listening failed...");
     } else {
         printf("Server listening...\n");
     }
@@ -85,21 +86,27 @@ int main(int argc, char *argv[]) {
     /*Server is waiting for clients*/
     connfd = accept(tcp_socket,(struct sockaddr *)&sock_cli, &len);
     if (connfd < 0) {
-        error("Failed server accept...\n");
+        close(tcp_socket);
+        close(connfd);
+        error("Failed server accept...");
     }
 
     while(1) {
         /*Receive data from a socket*/
         r = recv(connfd, (void*) buff, sizeof(buff), 0);
         if (r == -1) {
-            error("Receive data from client failed...\n");
+            close(connfd);
+            close(tcp_socket);
+            error("Receive data from client failed...");
         } else if (r > 0) {
             printf("+++ ");
             if (fputs(buff, stdout) == EOF) {
-                error("[ERROR]: fputs() failed...\n");
+                close(connfd);
+                close(tcp_socket);
+                error("[ERROR]: fputs() failed...");
             }
         }
-        /*PARA QUE HAY QUE UTILIZAR SCANF*/
+        
         /*Get message to client*/
         printf("> ");
         fgets(message, MAX, stdin);
