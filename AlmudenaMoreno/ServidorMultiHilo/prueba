@@ -1,4 +1,4 @@
 for i in `seq 1 150`; do
 	WAIT=`printf '0.%06d\n' $RANDOM`;
-	(sleep $WAIT; echo "Lanzando cliente $i ..."; ./client $i 212.128.254.25 8080) &
+	(sleep $WAIT; echo "Lanzando cliente $i ..."; ./client $i 127.0.0.1 8080) &
 done

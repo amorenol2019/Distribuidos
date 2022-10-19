@@ -21,14 +21,13 @@ Práctica 1. Ejercicio 2. Servidor Simple No Bloqueante
 int tcp_socket = 0;
 
 void error(char *msg) {
-    printf("%s", msg);
-    close(tcp_socket);
-    exit(FAIL);
+    printf("%s\n", msg);
+    exit(EXIT_FAILURE);
 }
 
 void ctrlHandler(int num) {
     close(tcp_socket);
-    exit(FAIL);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -53,7 +52,8 @@ int main(int argc, char *argv[]) {
     /*Create a socket and test*/
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (tcp_socket == -1) {
-        error("Socket creation failed...\n");
+        close(tcp_socket);
+        error("Socket creation failed...");
     } else {
         printf("Socket successfully created...\n");
     }
@@ -65,19 +65,22 @@ int main(int argc, char *argv[]) {
 
     /*Close socket without time wait*/
     if (setsockopt(tcp_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+        close(tcp_socket);
         error("setsockopt(SO_REUSEADDR) failed");
     }
 
     /*Assign specific direction to the socket and test*/
     if (bind(tcp_socket, (struct sockaddr *) &sock_serv, sizeof(sock_serv)) == -1) {
-        error("Socket bind failed...\n");
+        close(tcp_socket);
+        error("Socket bind failed...");
     } else {
         printf("Socket successfully binded...\n");
     }
     
     /*Server listening*/
     if (listen(tcp_socket, NCLIENTS) == -1) {
-        error("Listening failed...\n");
+        close(tcp_socket);
+        error("Listening failed...");
     } else {
         printf("Server listening...\n");
     }
@@ -88,29 +91,37 @@ int main(int argc, char *argv[]) {
     /*Server is waiting for clients*/
     connfd = accept(tcp_socket,(struct sockaddr *)&sock_cli, &len);
     if (connfd < 0) {
-        error("Failed server accept...\n");
+        close(connfd);
+        close(tcp_socket);
+        error("Failed server accept...");
     }
 
     while(1) {
-        /*Select: monitors file descriptos until readyy to I/O operations*/
-        FD_ZERO(&readmask); // Reset la mascara
-        FD_SET(connfd, &readmask); // Asignamos el nuevo descriptor
-        FD_SET(STDIN_FILENO, &readmask); // Entrada
+        //*Select: monitors file descriptos until readyy to I/O operations*/
+        FD_ZERO(&readmask); // Reset mask
+        FD_SET(connfd, &readmask); // Assign new descriptor
+        FD_SET(STDIN_FILENO, &readmask); // Entry
         //NULL Timeout - undefined waiting time
         timeout.tv_sec = 0; timeout.tv_usec = 0; // Timeout de 0.5 seg.
         if (select(connfd + 1, &readmask, NULL, NULL, &timeout) == -1) {
-            exit(FAIL);
+            close(tcp_socket);
+            close(connfd);
+            error("Select failed...");
         }
         /*Data to read from descriptor*/
         if (FD_ISSET(connfd, &readmask)) {
             /*Receive data from a socket*/
             r = recv(connfd, (void*) buff, sizeof(buff), 0);
             if (r == -1) {
-                error("Receive data from client failed...\n");
+                close(connfd);
+                close(tcp_socket);
+                error("Receive data from client failed...");
             } else if (r > 0) {
                 printf("+++ ");
                 if (fputs(buff, stdout) == EOF) {
-                    error("[ERROR]: fputs() failed...\n");
+                    close(connfd);
+                    close(tcp_socket);
+                    error("[ERROR]: fputs() failed...");
                 }
             }
         }
