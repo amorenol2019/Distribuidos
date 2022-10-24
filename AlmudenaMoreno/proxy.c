@@ -8,6 +8,15 @@ Práctica 2. Proxy
 #include <stdlib.h>
 #include <string.h>
 
+//Variables para el cliente y el servidor
+int sockfd = 0, connfd_p1 = 0, connfd_p2 = 0, connfd_p3 = 0;
+struct sockaddr_in servaddr;
+struct sockaddr_in serv_addr;
+
+struct message message;
+
+pthread_t thread;
+
 //P1 y P3 a P2
 //P2 recibe y envía a P1 a APAGARSE (READY_TO_SHUTDOWN)
 //P1 recibe y envía ACK  (SHUTDOWN_NOW)
@@ -22,7 +31,15 @@ void set_name (char name[2]) {
 
 // Establecer ip y puerto
 void set_ip_port (char* ip, unsigned int port) {
+    bzero(&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(port);
 
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(ip);
+    servaddr.sin_port = htons(port);
 }
 
 // Obtiene el valor del reloj de lamport.
