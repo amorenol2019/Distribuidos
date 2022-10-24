@@ -8,20 +8,29 @@ Práctica 2. P3
 #include <stdlib.h>
 #include <string.h>
 
-def argEntry(int argc, char *argv[]) {
+#define LCq 9
+
+int main (int argc, char *argv[]) {
     if(argc != 3) {
         error("Incorrect program call.\n Usage: ./P3 IP_DIRECTION PORT");
     }
     char *ip_dir = argv[1];
     int port = atoi(argv[2]);
 
-    return *ip_dir, port;
-}
+    connect_client();
 
-int main (int argc, char *argv[]) {
-    int port;
-    char *ip;
-    *ip, port = argEntry(int argc, char *argv[]);
+    init_thread();
+
+    notify_ready_shutdown;
+
+    while(get_clock_lamport() < LCq) {
+        usleep(10000)
+    }
+
+    notify_shutdown_ack();
+    printf("SHUTDOWN\n");
+
+    close_client();
 
     return 0;
 }
