@@ -1,5 +1,3 @@
-
-
 // Establece el nombre del proceso (para los logs y trazas)
 void set_name (char name[2]);
 // Establecer ip y puerto

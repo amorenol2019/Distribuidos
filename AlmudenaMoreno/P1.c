@@ -11,25 +11,26 @@ Práctica 2. P1
 #define LCq 5
 
 int main (int argc, char *argv[]) {
-    //Primero de todo es abrir canales de comunicación
+    setbuf(stdout, NULL);
+
     if(argc != 3) {
         error("Incorrect program call.\n Usage: ./P1 IP_DIRECTION PORT");
     }
     char *ip_dir = argv[1];
-    int port = argv[2];
+    int port = atoi(argv[2]);
 
     connect_client();
 
     init_thread();
 
-    notify_ready_shutdown;
+    notify_ready_shutdown();
 
     while(get_clock_lamport() < LCq) {
         usleep(10000)
     }
 
     notify_shutdown_ack();
-    printf("SHUTDOWN\n");
+    printf("SHUTDOWN ACTIVE\n");
 
     close_client();
 
