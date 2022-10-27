@@ -85,19 +85,6 @@ void notify_shutdown_ack() {
     }
 }
 
-
-//P1 y P3 a P2
-//P2 recibe y envía a P1 a APAGARSE (READY_TO_SHUTDOWN)
-//P1 recibe y envía ACK  (SHUTDOWN_NOW)
-//P2 recibe y envía a P3 a APAGARSE (READY_TO_SHUTDOWN)
-//P3 recibe y envía ACK  (SHUTDOWN_NOW)
-//P2 recibe:
-/*
-MENSAJES COMUNICACION
-PX, contador_lamport, SEND, operations
-PX, contador_lamport, RECV (PY), operations
-*/
-
 //INCIAR CONEXION SERVIDOR
 int connect_server() {
     if((bind(sockfd, (struct sockaddr*)&sock_serv, sizeof(sock_serv))) == -1){
@@ -112,6 +99,20 @@ int connect_server() {
     }
     return 0;
 }
+
+//P1 y P3 a P2
+//P2 recibe y envía a P1 a APAGARSE (READY_TO_SHUTDOWN)
+//P1 recibe y envía ACK  (SHUTDOWN_NOW)
+//P2 recibe y envía a P3 a APAGARSE (READY_TO_SHUTDOWN)
+//P3 recibe y envía ACK  (SHUTDOWN_NOW)
+//P2 recibe:
+/*
+MENSAJES COMUNICACION
+PX, contador_lamport, SEND, operations
+PX, contador_lamport, RECV (PY), operations
+*/
+
+
 
 //CONECTAR CLIENTE CON SERVIDOR
 //2 CLIENTES, 2 HILOS
@@ -176,13 +177,13 @@ int recv_client() {
 
 //INICIA EL THREAD DE UN CLIENTE
 void init_thread() {
-    pthread_create(&thread, NULL, msg_shutdown, NULL);
+    pthread_create(&thread[i], NULL, msg_shutdown, NULL);
 }
 
 //THREAD CLIENTE recibe SHUTDOWN_NOW, si no, error.
 void *msg_shutdown() {
     while(1) {
-        usleep(10000);
+        sleep(1);
         struct message shutdown;
         if ((recv(sockfd, &shutdown, sizeof(shutdown), 0)) != -1) {
             if(shutdown.action == SHUTDOWN_NOW) {
@@ -199,6 +200,7 @@ void *msg_shutdown() {
         }
 
     }
+
 }
 
 int sending_shutdown(char name[2]) {
@@ -233,10 +235,10 @@ int sending_shutdown(char name[2]) {
 int recv_ack(struct message ack, char name[2]) {
     int index;
 
-    if (strcmp(name, p1) == 0) {
+    if (ack.clock_lamport == 6 && strcmp(name, p1) == 0) {
         index = 0;
     }
-    else if (strcmp(name, p3) == 0) {
+    else if (ack.clock_lamport == 10 && strcmp(name, p3) == 0) {
         index = 1;
     }
     
@@ -266,14 +268,11 @@ int close_server() {
 }
 
 int close_client(){
-    if(pthread_join(thread, NULL) == -1) {
+    if(pthread_join(thread[0], NULL) == -1) {
       error("join failed");
     }
-    if(close(connfd[0]) == -1) {
-        error("Close failed");
-    }
-    if(close(connfd[1]) == -1) {
-        error("Close failed");
+    if(pthread_join(thread[1], NULL) == -1) {
+      error("join failed");
     }
     if(close(sockfd) == -1) {
         error("Close failed");
@@ -281,10 +280,3 @@ int close_client(){
 
     return 0;
 }
-
-/*
-
-
-
-
-*/
