@@ -11,6 +11,7 @@ Práctica 2. Proxy
 
 int sockfd = 0, i = 0;
 struct sockaddr_in sock;
+struct sockaddr_in sock_serv;
 int connfd[MAX_CLIENTS];
 char p1[MAX], p3[MAX];
 struct message msg;
@@ -36,12 +37,12 @@ void set_ip_port (char* ip, unsigned int port) {
     } else {
         printf("Socket successfully created...\n");
     }
-    /*
+    
     bzero(&sock_serv, sizeof(sock_serv));
     sock_serv.sin_family = AF_INET;
     sock_serv.sin_addr.s_addr = htonl(INADDR_ANY);
     sock_serv.sin_port = htons(port);
-    */
+    
     bzero(&sock, sizeof(sock));
     sock.sin_family = AF_INET;
     sock.sin_addr.s_addr = inet_addr(ip);
@@ -99,7 +100,7 @@ PX, contador_lamport, RECV (PY), operations
 
 //INCIAR CONEXION SERVIDOR
 int connect_server() {
-    if((bind(sockfd, (struct sockaddr*)&sock, sizeof(sock))) == -1){
+    if((bind(sockfd, (struct sockaddr*)&sock_serv, sizeof(sock_serv))) == -1){
         error("Socket bind failed...");
     } else {
         printf("Socket successfully binded...\n");
