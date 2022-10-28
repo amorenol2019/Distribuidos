@@ -21,19 +21,15 @@ int main (int argc, char *argv[]) {
     set_ip_port(ip, port);
 
     connect_client();
-
-    init_thread();
-
     notify_ready_shutdown();
 
+    recv_ready_shutdown("P3");
     while(get_clock_lamport() != LCq) {
         sleep(1);
     }
 
     notify_shutdown_ack();
-    printf("SHUTDOWN ACTIVE\n");
-
-    close_client();
+    //close_client(1);
 
     return 0;
 }

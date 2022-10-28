@@ -42,7 +42,7 @@ int connect_client();
 void error(char *message);
 unsigned int act_lamport(struct message clock);
 void recv_client();
-int recv_ack(int index);
+int recv_ack(char name[2]);
 int notify_shutdown_now(char name[2]);
 
 void *msg_ack(void *idc);

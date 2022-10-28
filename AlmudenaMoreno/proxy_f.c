@@ -186,11 +186,11 @@ int notify_shutdown_now(char name[2]) {
     ack.clock_lamport = msg.clock_lamport;
     ack.action = SHUTDOWN_NOW; 
 
-    printf("%s, %d, SEND, SHUTDOWN_NOW (%s)\n",ack.origin, msg.clock_lamport, name);
+    printf("%s, %d, SEND, SHUTDOWN_NOW (%s)\n",ack.origin, ack.clock_lamport, name);
 
-    if (msg.clock_lamport == 4 && strcmp(name, "P1") == 0) {
+    if (ack.clock_lamport == 4 && strcmp(name, "P1") == 0) {
         index = p1;
-    } else if (msg.clock_lamport == 8 && strcmp(name, "P3") == 0) {
+    } else if (ack.clock_lamport == 8 && strcmp(name, "P3") == 0) {
         index = p3;
     }
     else {
@@ -201,8 +201,7 @@ int notify_shutdown_now(char name[2]) {
     if (send(connfd[index], &ack, sizeof(ack), 0) == -1) {
         printf("ERROR sending the message\n");
     }
-
-    recv_ack(index);
+    printf("CLOCK P2 %d\n", get_clock_lamport());
 
     return 0;
 }
@@ -214,7 +213,7 @@ void recv_ready_shutdown(char id_client[2]) {
     } else if (strcmp(id_client, "P3") == 0) {
         pthread_create(&thread[p3], NULL, msg_shutdown, &p3);
     } else {
-        error(("RECEIVE READY TO SHUTDOWN %s Not valid client" , id_client));
+        error(("INIT THREAD %s Not valid client" , id_client));
     }
 }
 
@@ -232,9 +231,11 @@ void *msg_shutdown(void *idc) {
                 } else if (client == p3 && msg.clock_lamport == 9) {
                     printf("%s, %d, RECV (%s), SHUTDOWN_NOW\n", msg.origin, msg.clock_lamport, shutdown.origin);
                 } else {
+                    printf("%s%d\n",shutdown.origin, shutdown.clock_lamport);
                     error("Clock does not correspond to expected");
                 }
             } else {
+                printf("ACTION %d\n", shutdown.action);
                 //close_server();
                 error("ERROR : Not a valid operation");
             }
@@ -247,37 +248,34 @@ void *msg_shutdown(void *idc) {
     }
 }
 
-int recv_ack(int index) {
-    pthread_create(&thread[2], NULL, msg_ack, &index);
-    if(pthread_join(thread[2], NULL) == -1) {
-        //close_server();
-        error("join failed");
+int recv_ack(char name[2]) {
+
+    int index;
+    struct message ack;
+
+    if (strcmp(name, "P1") == 0) {
+        index = p1;
     }
-}
-
-void *msg_ack(void *idc) {
-    int index = *(int *) idc;
+    else if (strcmp(name, "P3") == 0) {
+        index = p3;
+    }
     
-    while ( msg.clock_lamport == 4 || msg.clock_lamport == 8) {
-        struct message ack;
-        // Esperamos al ack del cliente
-
-        if (recv(connfd[index], &ack, sizeof(ack), 0) == -1) {
-            printf("Receive data from client failed...\n");
-        } else {
-            //Esperamos el shotdown ack
-            if(ack.action == SHUTDOWN_ACK) {
-                msg.clock_lamport = act_lamport(ack);
-                if (index == p1 && msg.clock_lamport == 7) {
-                    printf("%s, %d, RECV (%s), SHUTDOWN_ACK\n", msg.origin, msg.clock_lamport, ack.origin);
-                } else if (index == p3 && msg.clock_lamport == 11) {
-                    printf("%s, %d, RECV (%s), SHUTDOWN_ACK\n", msg.origin, msg.clock_lamport, ack.origin);
-                }
-            }else {
-                //close_server();
-                error("RECV_ACK ERROR : Not a valid operation");
-            }
+    // Esperamos al ack del cliente
+    if (recv(connfd[index], &ack, sizeof(ack),0) == -1) {
+        printf("Receive data from client failed...\n");
+    } else {
+        //Esperamos el shotdown ack
+        if(ack.action == SHUTDOWN_ACK) {
+            msg.clock_lamport = act_lamport(ack); 
+            printf("%s, %d, RECV (%s), SHUTDOWN_ACK\n", msg.origin, msg.clock_lamport, ack.origin);
+        }else {
+            //close_server();
+            error("RECV_ACK ERROR : Not a valid operation");
         }
     }
-    
+
+    return 0;
 }
+
+
+
