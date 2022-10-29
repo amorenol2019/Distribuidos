@@ -269,6 +269,7 @@ void *msg_shutdown(void *idc) {
                     printf("%s, %d, RECV (%s), SHUTDOWN_NOW\n", msg.origin, msg.clock_lamport, shutdown.origin);
                 } else {
                     close_client();
+                    printf("CLIENT %d %d\n", client, msg.clock_lamport);
                     error("Clock does not correspond to expected");
                 }
             } else {
