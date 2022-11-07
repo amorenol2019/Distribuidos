@@ -1,0 +1,30 @@
+Repaso concurrencia
+Condición de carrera. Situacion en un programa donde utilizan varios hilos el mismo recurso y no están corregidos.
+Operación atómica. Operación que se realiza sin necesidad de ser expulsada de la CPU.
+Exclusión mutua. Cuando entra un proceso, otro no puede estar. Solución a exclusión mutua. Está protegido correctamente.
+Región crítica. Normalmente, la ves crítica, y sólo puede entrar el número de threads decidido.
+Espera activa. Vamos a consumir bastante más CPU. El programa decide cuando despertarse.
+Mutex. Mecanismo de sincronización qe no hace espera activa. Sirve para solucionar problemas de condiciones de carrera..
+Spinlock. Lo mismo que mutex, pero hace espera activa. Reduce la latencia a la hora de acceder al cerrojo. Debe correr en un sistema multiprocesador 
+
+Concurrencia Avanzada
+- Proteger regiones críticas (Thread-safe)
+- Sincronización a través de señales.
+- Evitar espera activa.
+
+Espera Activa:
+Técnica donde un proceso está repetidamente comprobando una condición.
+- Esperar pulsación de teclado
+- Esperar a habilitación de sección crítica
+Estrategia válida para sincronización de procesos.
+- Sistemas
+
+El thread tiene hambruna (nunca entra en la región crítica, nunca ejecuta), cuando uno de los dos threads se queda bloqueado durante un thread (por el lock/unlock del mutex). SIempre hay que proteger las partes claves donde modificamos el recurso.
+Para imprimir value, no hace falta mutex, porque nadie lo modifica. Lectores puede nacceder concurrentemente y continuamente sin necesidad de protección.
+Si hay al menos uno de escritura, hay que protegerlos, y que entren de uno en uno. Hace falta saber la semántica de la región crítica.
+
+Semaforo 
+sem_wait es bloqueante
+sem_trywait es no bloqueante
+
+Tenemos que tener el signal justo antes del unlock
