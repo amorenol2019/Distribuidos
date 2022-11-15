@@ -47,20 +47,18 @@ int main (int argc, char *argv[]) {
 
     static struct option long_options[] =
     {
-        {"port", required_argument, 0, 'port'},
-        {"priority", required_argument, 0, 'p'},
+        {"port", required_argument, 0, 'o'},
+        {"priority", required_argument, 0, 'i'},
         {"ratio", optional_argument, 0, 'r'},
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv,"port:p:r:", 
-                    long_options, NULL )) != -1) {
-
-        printf("%d", opt);
+    while ((opt = getopt_long(argc, argv,"o:i:r:", 
+                    long_options, &long_index )) != -1) {
         switch (opt) {
-            case 'port' : port = atoi(optarg);
+            case 'o' : port = atoi(optarg);
                 break;
-            case 'p' : priority = optarg;
+            case 'i' : priority = optarg;
                 break;
             case 'r' : num_ratio = atoi(optarg); 
                 break;
@@ -72,8 +70,18 @@ int main (int argc, char *argv[]) {
     if ((strcmp(priority, "writer") != 0) && (strcmp(priority, "reader") != 0)) {
         error(RED USAGE RESET_COLOR);
     }
-    printf("%s %d\n ", priority, port);
 
+    set_client(port);
+
+    FILE* file;
+    file = fopen("server_output.txt", "w");
+
+    connect_server();
+    signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
+
+    while(1) {
+        recv_client();
+    }
 
     return 0; 
 }

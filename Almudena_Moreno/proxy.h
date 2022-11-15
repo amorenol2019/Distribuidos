@@ -23,6 +23,41 @@ struct response {
     long waiting_time;        //Tiempo que ha esperado para llevar a cabo su 'action'
 };
 
+struct thread_clients {
+    enum operations action;   //WRITE O READ
+    unsigned int num_threads;          //ID Cliente
+};
+
 void error(char *message);
 void ctrlHandler(int num);
+void ctrlHandlerServer(int num);
 
+/*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+void set_client (unsigned int port);
+
+int connect_server();
+
+void recv_client();
+void *msg_ready();
+
+int notify_shutdown_now(char name[2]);
+
+int close_server();
+
+void ctrlHandlerServer(int num);
+
+/*////////////////////////////---------------------CLIENT---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+void set_ip_port (char* ip, unsigned int port);
+
+int connect_client();
+
+void read_or_write(int threads, char* mode);
+
+void notify_ready_shutdown();
+
+void recv_shutdown_now(char id_client[2]);
+void *msg_shutdown(void *idc);
+
+int close_client();
+
+void ctrlHandler(int num);

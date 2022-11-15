@@ -27,30 +27,29 @@ int main (int argc, char *argv[]) {
     int opt = 0, long_index = 0;
     char *ip, *mode;
     int port, num_threads;
-    //signal(SIGINT, ctrlHandler);   //Close with CTRL + C
 
     if(argc != 9) {
         error(RED USAGE RESET_COLOR);
     }
     static struct option long_options[] =
     {
-        {"ip", required_argument, NULL, 'ip'},
+        {"ip", required_argument, NULL, 'i'},
         {"mode", required_argument, NULL, 'm'},
         {"port", required_argument, NULL, 'p'},
-        {"threads", required_argument, NULL, 'nt'},
+        {"threads", required_argument, NULL, 'n'},
         {NULL, 0, NULL, 0}
     };
 
-    while ((opt = getopt_long(argc, argv,"ip:m:p:nt:", 
+    while ((opt = getopt_long(argc, argv,"i:m:p:n:", 
                     long_options, &long_index )) != -1) {
         switch (opt) {
-             case 'ip' : ip = optarg;
+             case 'i' : ip = optarg;
                  break;
              case 'm' : mode = optarg;
                  break;
              case 'p' : port = atoi(optarg); 
                  break;
-             case 'nt' : num_threads = atoi(optarg);
+             case 'n' : num_threads = atoi(optarg);
                  break;
              default: error(RED USAGE RESET_COLOR); 
         }
@@ -59,6 +58,13 @@ int main (int argc, char *argv[]) {
     if ((strcmp(mode, "writer") != 0) && (strcmp(mode, "reader") != 0)) {
         error(RED USAGE RESET_COLOR);
     }
+
+    set_ip_port(ip, port);
+    int id_client = 1;
+    connect_client();
+    signal(SIGINT, ctrlHandler);   //Close with CTRL + C
+
+    read_or_write(num_threads, mode);
 
     return 0;   
 }
