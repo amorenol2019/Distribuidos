@@ -48,10 +48,9 @@ void ctrlHandlerServer(int num);
 
 /*////////////////////////////---------------------CLIENT---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port (char* ip, unsigned int port);
-
-int connect_client();
-
-void read_or_write(int threads, char* mode);
+void create_socket();
+void *connect_client();
+void read_or_write(char* ip, int port, int threads, char* mode);
 
 void notify_ready_shutdown();
 

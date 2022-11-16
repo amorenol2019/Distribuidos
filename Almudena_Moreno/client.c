@@ -59,12 +59,9 @@ int main (int argc, char *argv[]) {
         error(RED USAGE RESET_COLOR);
     }
 
-    set_ip_port(ip, port);
-    int id_client = 1;
-    connect_client();
     signal(SIGINT, ctrlHandler);   //Close with CTRL + C
 
-    read_or_write(num_threads, mode);
+    read_or_write(ip, port, num_threads, mode);
 
     return 0;   
 }
