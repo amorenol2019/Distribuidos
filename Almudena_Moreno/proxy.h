@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <pthread.h>
 
 enum operations {
@@ -26,6 +27,11 @@ struct response {
 void error(char *message);
 void ctrlHandler(int num);
 void ctrlHandlerServer(int num);
+
+void close_fd();
+void open_fd(char mode[2]);
+void write_fd();
+void read_fd();
 
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_client (unsigned int port);

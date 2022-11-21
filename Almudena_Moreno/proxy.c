@@ -12,12 +12,7 @@ Semáforos, variables condición, mutex
 
 #define backlog 2000
 #define MAX_CLIENTS 250
-#define L_SIZE 250
-
-void error(char *message) {
-    printf("%s\n", message);
-    exit(EXIT_FAILURE);
-}
+#define L_SIZE 1024
 
 int sockfd = 0, counter = 0, roll;
 struct sockaddr_in sock;
@@ -32,6 +27,36 @@ struct response msg_serv;
 struct request msg_client;
 struct response msg_resp;
 
+void error(char *message) {
+    printf("%s\n", message);
+    exit(EXIT_FAILURE);
+}
+
+void open_fd(char mode[2]) {
+    if ((file = fopen("server_output.txt", mode)) == NULL) {
+        error("Error opening file");
+    }
+}
+
+void close_fd() {
+    if (fclose(file) == EOF) {
+        error("Error closing file");
+    }
+}
+
+void write_fd() {
+    if (fprintf(file, "%d\n", msg_serv.counter) < 0) {
+        error("Error writing file");
+    }
+}
+
+void read_fd() {
+    if (fgets(fline, L_SIZE, file) == NULL) {
+        msg_serv.counter = 0;
+    } else {
+        msg_serv.counter = atoi(fline);
+    }
+}
 
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_client (unsigned int port) {
@@ -55,21 +80,19 @@ void set_client (unsigned int port) {
     if((bind(sockfd, (struct sockaddr*)&sock_serv, sizeof(sock_serv))) == -1) {
         error("Socket bind failed...");
     } 
+
     if((listen(sockfd, backlog)) == -1) {
         close_server();
         error("Listen failed...");
     }
-    if ((file = fopen("server_output.txt", "a+")) == NULL) {
-        error("Error opening file");
-    }
-    if (fgets(fline, L_SIZE, file) == NULL) {
-        msg_serv.counter = 0;
-    } else {
-        msg_serv.counter = atoi(fline);
-    }
+
+    open_fd("a+");
+    read_fd();
 }
 
 void recv_client() {
+    struct timeval wait_time_init;
+    struct timeval wait_time_end;
     /*Server is waiting for clients*/
     connfd = accept(sockfd,(struct sockaddr *)NULL, NULL);
     if (connfd < 0) {
@@ -81,13 +104,16 @@ void recv_client() {
         error("Recv from the client failed...\n");
     }
 
-    printf("[SECONDS.MICRO] ");
+    if (gettimeofday(&wait_time_init, 0) == -1) {
+        error("Error getting stamp of time");
+    }
+
+    printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
     if (msg_recv.action == WRITE) {
         msg_serv.counter++;
-
-        if (fprintf(file, "%d\n", msg_serv.counter) < 0) {
-            error("Error writing file");
-        }
+        close_fd();
+        open_fd("w");
+        write_fd();
         printf("[ESCRITOR #%d] modifica contador con valor\n", msg_recv.id);
     } else if (msg_recv.action == READ) {
         printf("[LECTOR #%d] lee contador con valor\n", msg_recv.id);
@@ -95,8 +121,14 @@ void recv_client() {
         error("Not action allowed");
     }
 
+    if (gettimeofday(&wait_time_end, 0) == -1) {
+        error("Error getting stamp of time");
+    }
+
+   int diff = ((wait_time_end.tv_sec - wait_time_init.tv_sec)*1000000 + wait_time_end.tv_usec) - wait_time_init.tv_usec;
+
     msg_serv.action = msg_recv.action;
-    msg_serv.waiting_time = 0;
+    msg_serv.waiting_time = diff * 1000;
 
     if (send(connfd, &msg_serv, sizeof(msg_serv), 0) < 0) {
         printf("Send to server failed...\n");
@@ -114,11 +146,16 @@ int close_server() {
 
 void ctrlHandlerServer(int num) {
     close_server();
+    close_fd();
     printf("\n");
     exit(EXIT_SUCCESS);
 }
 
 /*/////////////////////////////---------------------CLIENTS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+
+/*Cuando este leyendo, variable que sea true lectores, y cuando cambie a escritores que cambie para
+saber cuando tengo que volver a leer del fichero*/
+
 void set_ip_port (char* ip, unsigned int port) {
     bzero(&sock, sizeof(sock));
     sock.sin_family = AF_INET;
@@ -139,6 +176,8 @@ void create_socket() {
         error("setsockopt(SO_REUSEADDR) failed");
     }
 }
+
+
 
 void read_or_write(char* ip, int port, int threads, char* mode) {
     //pthread_t clients[threads];
