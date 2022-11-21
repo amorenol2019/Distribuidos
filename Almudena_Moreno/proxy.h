@@ -23,11 +23,6 @@ struct response {
     long waiting_time;        //Tiempo que ha esperado para llevar a cabo su 'action'
 };
 
-struct thread_clients {
-    enum operations action;   //WRITE O READ
-    unsigned int num_threads;          //ID Cliente
-};
-
 void error(char *message);
 void ctrlHandler(int num);
 void ctrlHandlerServer(int num);

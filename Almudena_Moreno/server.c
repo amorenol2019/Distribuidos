@@ -73,10 +73,6 @@ int main (int argc, char *argv[]) {
 
     set_client(port);
 
-    FILE* file;
-    file = fopen("server_output.txt", "w");
-
-    connect_server();
     signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
 
     while(1) {

@@ -62,6 +62,6 @@ int main (int argc, char *argv[]) {
     signal(SIGINT, ctrlHandler);   //Close with CTRL + C
 
     read_or_write(ip, port, num_threads, mode);
-
+    sleep(1);
     return 0;   
 }
