@@ -14,10 +14,12 @@ Semáforos, variables condición, mutex
 #define MAX_CLIENTS 250
 #define L_SIZE 1024
 
-int sockfd = 0, counter = 0, roll;
+int sockfd = 0, counter = 0, roll, num_clients = 0;
+int sock_cli[MAX_CLIENTS];
+
 struct sockaddr_in sock;
 struct sockaddr_in sock_serv;
-int connfd; //[MAX_CLIENTS];
+int connfd[MAX_CLIENTS];
 char fline[L_SIZE];
 
 FILE* file;
@@ -94,13 +96,14 @@ void recv_client() {
     struct timeval wait_time_init;
     struct timeval wait_time_end;
     /*Server is waiting for clients*/
-    connfd = accept(sockfd,(struct sockaddr *)NULL, NULL);
-    if (connfd < 0) {
+    
+    connfd[num_clients] = accept(sockfd,(struct sockaddr *)NULL, NULL);
+    if (connfd[num_clients] < 0) {
         close(sockfd);
-        close(connfd);
+        close(connfd[num_clients]);
         error("Failed server accept...");
     }
-    if ((recv(connfd, &msg_recv, sizeof(msg_recv), 0)) < 0) {
+    if ((recv(connfd[num_clients], &msg_recv, sizeof(msg_recv), 0)) < 0) {
         error("Recv from the client failed...\n");
     }
 
@@ -114,9 +117,9 @@ void recv_client() {
         close_fd();
         open_fd("w");
         write_fd();
-        printf("[ESCRITOR #%d] modifica contador con valor\n", msg_recv.id);
+        printf("[ESCRITOR #%d] modifica contador con valor %d\n", msg_recv.id, msg_serv.counter);
     } else if (msg_recv.action == READ) {
-        printf("[LECTOR #%d] lee contador con valor\n", msg_recv.id);
+        printf("[LECTOR #%d] lee contador con valor %d\n", msg_recv.id, msg_serv.counter);
     } else {
         error("Not action allowed");
     }
@@ -130,10 +133,12 @@ void recv_client() {
     msg_serv.action = msg_recv.action;
     msg_serv.waiting_time = diff * 1000;
 
-    if (send(connfd, &msg_serv, sizeof(msg_serv), 0) < 0) {
-        printf("Send to server failed...\n");
+    if (send(connfd[num_clients], &msg_serv, sizeof(msg_serv), 0) < 0) {
+        error("Send to server failed...\n");
     }
     printf("SEND response COUNTER %d, WAITING TIME, %ld, ACTION, %d\n", msg_serv.counter, msg_serv.waiting_time, msg_serv.action);
+    num_clients++;
+
 }
 
 int close_server() {
@@ -163,38 +168,56 @@ void set_ip_port (char* ip, unsigned int port) {
     sock.sin_port = htons(port);
 }
 
-void create_socket() {
+void create_socket(int id) {
     const int enable = 1;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
+    sock_cli[id] = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_cli[id] == -1) {
         error("Socket creation failed...");
     }
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+    if (setsockopt(sock_cli[id], SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         close_server();
         error("setsockopt(SO_REUSEADDR) failed");
     }
 }
 
-
-
 void read_or_write(char* ip, int port, int threads, char* mode) {
-    //pthread_t clients[threads];
+    pthread_t clients[threads];
 
     if (strcmp(mode, "reader") == 0) {
         roll = 1;
-
     } else if (strcmp(mode, "writer") == 0) {
         roll = 0;
     }
 
     set_ip_port(ip, port);
+    /*
+    int id_thread[threads];
+    for (int i = 0; i < threads; i++) {
+        id_thread[i] = i;
+    }
+    */
 
-    int t_id = 0;
+    for (int i = 0; i < threads; i++) {
+        pthread_create(&clients[i], NULL, &connect_client, &i);
+    }
 
-    create_socket();
-    if((connect(sockfd, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
+    for(int i = 0; i < threads; i++) {
+        if(pthread_join(clients[i], NULL) == -1) {
+            printf("Error pthread_join...\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+void *connect_client(void *arg) {
+    int t_id = *(int *)arg;
+    msg_client.action = roll;
+    msg_client.id = t_id;
+
+    create_socket(t_id);
+    if((connect(sock_cli[t_id], (struct sockaddr*)&sock, sizeof(sock))) == -1) {
         error("Connection with the server failed...");
     }
 
@@ -204,10 +227,13 @@ void read_or_write(char* ip, int port, int threads, char* mode) {
     if (send(sockfd, &msg_client, sizeof(msg_client), 0) == -1) {
         error("Send to server failed...\n");
     }
+
     printf("[CLIENT #%d] Send %d\n", msg_client.id, msg_client.action);
+    if (send(sock_cli[t_id], &msg_client, sizeof(msg_client), 0) == -1) {
+        printf("Send to server failed...\n");
+    }
 
-
-    if ((recv(sockfd, (void *) &msg_resp, sizeof(msg_resp), 0)) == -1) {
+    if ((recv(sock_cli[t_id], (void *) &msg_resp, sizeof(msg_resp), 0)) == -1) {
         error("Receive message failed...");
     } else {
         if (msg_resp.action == WRITE) {
@@ -218,18 +244,21 @@ void read_or_write(char* ip, int port, int threads, char* mode) {
             printf("Response action %d\n", msg_resp.action);
         }
     }
+
+    return 0;
 }
 
-int close_client(){
-    if(close(sockfd) == -1) {
+int close_client(int id){
+    if(close(sock_cli[id]) == -1) {
         error("Close failed");
     }
 
     return 0;
 }
 
+
 void ctrlHandler(int num) {
-    close_client();
+    close_client(counter);
     printf("\n");
     exit(EXIT_SUCCESS);
 }

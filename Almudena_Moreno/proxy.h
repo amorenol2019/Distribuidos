@@ -49,7 +49,7 @@ void ctrlHandlerServer(int num);
 
 /*////////////////////////////---------------------CLIENT---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port (char* ip, unsigned int port);
-void create_socket();
+void create_socket(int id);
 void *connect_client();
 void read_or_write(char* ip, int port, int threads, char* mode);
 
@@ -58,6 +58,6 @@ void notify_ready_shutdown();
 void recv_shutdown_now(char id_client[2]);
 void *msg_shutdown(void *idc);
 
-int close_client();
+int close_client(int id);
 
 void ctrlHandler(int num);

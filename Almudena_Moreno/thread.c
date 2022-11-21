@@ -176,8 +176,6 @@ void *connect_client(void *arg) {
     create_socket(t_id);
     if((connect(sock_cli[t_id], (struct sockaddr*)&sock, sizeof(sock))) == -1) {
         error("Connection with the server failed...");
-    } else {
-        printf("Connected to the server...\n");
     }
     
     printf("[CLIENT #%d] Send %d\n", msg_client.id, msg_client.action);
