@@ -6,7 +6,7 @@ Práctica 2. Proxy
 
 #include "proxy.h"
 
-int sockfd = 0, id = 0, counter = 0, p1 = -1, p3 = -1;
+int sockfd = 0, counter = 0, p1 = 0, p3 = 1;
 struct sockaddr_in sock;
 struct sockaddr_in sock_serv;
 int connfd[2];
@@ -30,8 +30,6 @@ void set_ip_port (char* ip, unsigned int port) {
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
         error("Socket creation failed...");
-    } else {
-        printf("Socket successfully created...\n");
     }
     
     bzero(&sock_serv, sizeof(sock_serv));
@@ -79,14 +77,10 @@ int p1_or_p3(char name[2]) {
 int connect_server() {
     if((bind(sockfd, (struct sockaddr*)&sock_serv, sizeof(sock_serv))) == -1) {
         error("Socket bind failed...");
-    } else {
-        printf("Socket successfully binded...\n");
     }
     if((listen(sockfd, 2)) == -1) {
         close_server();
         error("Listen failed...");
-    } else {
-        printf("Server listening...\n");
     }
 
     return 0;
@@ -105,12 +99,12 @@ void *msg_ready() {
     struct message msg_recv;
 
     while(counter < 2) {
-        connfd[id] = accept(sockfd,(struct sockaddr*)NULL, NULL);
-        if (connfd[id] == -1){
+        int connfd_ = accept(sockfd,(struct sockaddr*)NULL, NULL);
+        if (connfd_ == -1){
             close_server();
             error("Failed server accept...");
         }
-        if ((recv(connfd[id], &msg_recv, sizeof(msg_recv),0)) == -1) {
+        if ((recv(connfd_, &msg_recv, sizeof(msg_recv),0)) == -1) {
             printf("Receive data from client failed...\n");
         }else {
             // READY_TO_SHUTDOWN
@@ -126,11 +120,12 @@ void *msg_ready() {
         
         //CLIENTE P1 O P3
         if(strcmp("P1", msg_recv.origin) == 0) {
-            p1 = id;
+            connfd[p1] = connfd_;
+        
         } else if (strcmp("P3", msg_recv.origin) == 0) {
-            p3 = id;
-        } 
-        id++;
+            connfd[p3] = connfd_;
+        }
+        
         counter++;
     }
     if (p1 == -1 || p3 == -1) {
@@ -230,8 +225,6 @@ int connect_client() {
     /*Create a socket and test*/
     if((connect(sockfd, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
         error("Connection with the server failed...");
-    } else {
-        printf("Connected to the server...\n");
     }
 
     return 0;
@@ -253,7 +246,6 @@ void notify_ready_shutdown() {
 //Receive shutdown_now from client
 void recv_shutdown_now(char id_client[2]) {
     int client = p1_or_p3(id_client);
-
     pthread_create(&thread[client], NULL, msg_shutdown, &client);
 }
 
@@ -265,7 +257,7 @@ void *msg_shutdown(void *idc) {
         if ((recv(sockfd, &shutdown, sizeof(shutdown), 0)) != -1) {
             if(shutdown.action == SHUTDOWN_NOW) {
                 msg.clock_lamport = update_lamport(shutdown);
-                if ((client == p1 && msg.clock_lamport == 5) || (client == p3 && msg.clock_lamport == 9)) {
+                if ((client == 0 && msg.clock_lamport == 5) || (client == 1 && msg.clock_lamport == 9)) {
                     printf("%s, %d, RECV (%s), SHUTDOWN_NOW\n", msg.origin, msg.clock_lamport, shutdown.origin);
                 } else {
                     close_client();

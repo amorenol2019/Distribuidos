@@ -4,9 +4,9 @@ CC = gcc
 CFLAGS = -g -I. -Wall -Wshadow
 LIBRARY = -lpthread
 
-OBJ1 = P1.o proxy.o
-OBJ2 = P2.o proxy.o
-OBJ3 = P3.o proxy.o
+OBJ1 = P1.c proxy.o
+OBJ2 = P2.c proxy.o
+OBJ3 = P3.c proxy.o
 
 proxy.o: proxy.c proxy.h
 	$(CC) $(CFLAGS) $(LIBRARY) -c proxy.c 
