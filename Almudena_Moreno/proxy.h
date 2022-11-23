@@ -7,6 +7,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 enum operations {
     WRITE = 0,   //Quiere escribir
@@ -25,21 +26,18 @@ struct response {
 };
 
 void error(char *message);
-void ctrlHandler(int num);
-void ctrlHandlerServer(int num);
-
 void close_fd();
 void open_fd(char mode[2]);
 void write_fd();
 void read_fd();
-
+void sem_create();
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_client (unsigned int port);
 
 int connect_server();
 
 void recv_client();
-void *msg_ready();
+void *communicate_client(void *arg);
 
 int notify_shutdown_now(char name[2]);
 
@@ -49,7 +47,7 @@ void ctrlHandlerServer(int num);
 
 /*////////////////////////////---------------------CLIENT---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port (char* ip, unsigned int port);
-void create_socket(int id);
+int create_socket(int id);
 void *connect_client();
 void read_or_write(char* ip, int port, int threads, char* mode);
 

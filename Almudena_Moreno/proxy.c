@@ -5,32 +5,40 @@ Práctica 3. Proxy
 
 
 Semáforos, variables condición, mutex
-
+Un mutex no vale para sincronización, sirve para excluir uno a uno
+VARIALES CONDICION: Un escritor no puede liberar solamente a un lector
+sI NO HAY ESCRITORIES, LOS LECTORES NO SE TIENEN QUE BLOQUEAR
 */
 
 #include "proxy.h"
 
 #define backlog 2000
-#define MAX_CLIENTS 250
+#define MAX_THREADS 250
+#define MAX_CLIENTS 1000
 #define L_SIZE 1024
-#define SEM_VALUE_CLIENT 250
 
 int sockfd = 0, counter = 0, roll, num_clients = 0;
 int sock_cli[MAX_CLIENTS];
-
-struct sockaddr_in sock;
-struct sockaddr_in sock_serv;
 int connfd[MAX_CLIENTS];
+
+char fline[L_SIZE];
 char fline[L_SIZE];
 
 FILE* file;
 
-sem_t sem_numero_clientes;
+pthread_t c_server[MAX_THREADS];
+
+sem_t sem_max_threads;
+sem_t mutex_server;
+
+struct sockaddr_in sock;
+struct sockaddr_in sock_serv;
 
 struct request msg_recv;
-struct response msg_serv;
 struct request msg_client;
 struct response msg_resp;
+struct response msg_serv;
+
 
 void error(char *message) {
     printf("%s\n", message);
@@ -67,6 +75,8 @@ void read_fd() {
 void set_client (unsigned int port) {
     const int enable = 1;
 
+    srand(time(NULL));
+
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
         error("Socket creation failed...");
@@ -96,60 +106,78 @@ void set_client (unsigned int port) {
 }
 
 void recv_client() {
-    struct timeval wait_time_init;
-    struct timeval wait_time_end;
     /*Server is waiting for clients*/
-    srand (time(NULL));
-
     connfd[num_clients] = accept(sockfd,(struct sockaddr *)NULL, NULL);
     if (connfd[num_clients] < 0) {
         close(sockfd);
         close(connfd[num_clients]);
         error("Failed server accept...");
     }
-    if ((recv(connfd[num_clients], &msg_recv, sizeof(msg_recv), 0)) < 0) {
+
+    pthread_create(&c_server[num_clients], NULL, &communicate_client, (void *) &connfd[num_clients]);
+    //pthread_join(c_server[num_clients], NULL);
+    num_clients++;
+}
+
+void *communicate_client(void *arg) {
+    int connfd_ = *(int *)arg;
+    struct timeval wait_time_init;
+    struct timeval wait_time_end;
+    
+    if ((recv(connfd_, &msg_recv, sizeof(msg_recv), 0)) < 0) {
         error("Recv from the client failed...\n");
     }
-
     if (gettimeofday(&wait_time_init, 0) == -1) {
         error("Error getting stamp of time");
     }
-    
+
+    sem_wait(&sem_max_threads);
+
+    //ESPERANDO PARA ENTRAR A LA REGIÓN CRÍTICA
+
+
+    sem_wait(&mutex_server);
+    if (gettimeofday(&wait_time_end, 0) == -1) {
+        error("Error getting stamp of time");
+    }
     //Comienza la región crítica
-    printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
     if (msg_recv.action == WRITE) {
         msg_serv.counter++;
         close_fd();
         open_fd("w");
         write_fd();
+        printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
         printf("[ESCRITOR #%d] modifica contador con valor %d\n", msg_recv.id, msg_serv.counter);
     } else if (msg_recv.action == READ) {
+        printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
         printf("[LECTOR #%d] lee contador con valor %d\n", msg_recv.id, msg_serv.counter);
     } else {
         error("Not action allowed");
     }
 
-    if (gettimeofday(&wait_time_end, 0) == -1) {
-        error("Error getting stamp of time");
-    }
-    int sleep_number = rand () % 25000 + 75000;
+
+    int sleep_number = rand () % 76 + 75;
+    usleep(sleep_number);
     int diff = ((wait_time_end.tv_sec - wait_time_init.tv_sec)*1000000 + wait_time_end.tv_usec) - wait_time_init.tv_usec;
 
     msg_serv.action = msg_recv.action;
     msg_serv.waiting_time = diff * 1000;
 
-    if (send(connfd[num_clients], &msg_serv, sizeof(msg_serv), 0) < 0) {
+    if (send(connfd_, &msg_serv, sizeof(msg_serv), 0) < 0) {
         error("Send to server failed...\n");
     }
-    printf("SEND response COUNTER %d, WAITING TIME, %ld, ACTION, %d\n", msg_serv.counter, msg_serv.waiting_time, msg_serv.action);
-    num_clients++;
-
+    //printf("SEND response COUNTER %d, WAITING TIME, %ld, ACTION, %d\n", msg_serv.counter, msg_serv.waiting_time, msg_serv.action);
+    sem_post(&mutex_server);
+    sem_post(&sem_max_threads);
     //Fin de región critica
 
+    return 0;
 }
 
 void sem_create() {
-    sem_init(&sem_numero_clientes, 0, 1);
+    sem_init(&sem_max_threads, 0, MAX_THREADS);
+    sem_init(&mutex_server, 0, 1);
+
 }
 
 int close_server() {
@@ -179,18 +207,20 @@ void set_ip_port (char* ip, unsigned int port) {
     sock.sin_port = htons(port);
 }
 
-void create_socket(int id) {
+int create_socket(int id) {
     const int enable = 1;
-
-    sock_cli[id] = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_cli[id] == -1) {
+    int socket_cli;
+    socket_cli = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_cli == -1) {
         error("Socket creation failed...");
     }
 
-    if (setsockopt(sock_cli[id], SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
+    if (setsockopt(socket_cli, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         close_server();
         error("setsockopt(SO_REUSEADDR) failed");
     }
+
+    return socket_cli;
 }
 
 void read_or_write(char* ip, int port, int threads, char* mode) {
@@ -203,15 +233,13 @@ void read_or_write(char* ip, int port, int threads, char* mode) {
     }
 
     set_ip_port(ip, port);
-    /*
+
     int id_thread[threads];
     for (int i = 0; i < threads; i++) {
         id_thread[i] = i;
     }
-    */
-
     for (int i = 0; i < threads; i++) {
-        pthread_create(&clients[i], NULL, &connect_client, &i);
+        pthread_create(&clients[id_thread[i]], NULL, &connect_client, (void *) &id_thread[i]);
     }
 
     for(int i = 0; i < threads; i++) {
@@ -227,7 +255,7 @@ void *connect_client(void *arg) {
     msg_client.action = roll;
     msg_client.id = t_id;
 
-    create_socket(t_id);
+    sock_cli[t_id] = create_socket(t_id);
     if((connect(sock_cli[t_id], (struct sockaddr*)&sock, sizeof(sock))) == -1) {
         error("Connection with the server failed...");
     }
@@ -235,11 +263,7 @@ void *connect_client(void *arg) {
     msg_client.action = roll;
     msg_client.id = t_id;
 
-    if (send(sockfd, &msg_client, sizeof(msg_client), 0) == -1) {
-        error("Send to server failed...\n");
-    }
-
-    printf("[CLIENT #%d] Send %d\n", msg_client.id, msg_client.action);
+    //printf("[CLIENT #%d] Send %d\n", msg_client.id, msg_client.action);
     if (send(sock_cli[t_id], &msg_client, sizeof(msg_client), 0) == -1) {
         printf("Send to server failed...\n");
     }
@@ -248,9 +272,9 @@ void *connect_client(void *arg) {
         error("Receive message failed...");
     } else {
         if (msg_resp.action == WRITE) {
-            printf("Cliente #%d Escritor, contador = %d, tiempo = %ld ns. \n", t_id, msg_resp.counter, msg_resp.waiting_time);
+            printf("[Cliente #%d] Escritor, contador = %d, tiempo = %ld ns. \n", t_id, msg_resp.counter, msg_resp.waiting_time);
         } else if (msg_resp.action == READ) {
-            printf("Cliente #%d Lector, contador = %d, tiempo = %ld ns. \n", t_id, msg_resp.counter, msg_resp.waiting_time);
+            printf("[Cliente #%d] Lector, contador = %d, tiempo = %ld ns. \n", t_id, msg_resp.counter, msg_resp.waiting_time);
         } else {
             printf("Response action %d\n", msg_resp.action);
         }

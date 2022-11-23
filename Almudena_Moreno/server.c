@@ -74,7 +74,7 @@ int main (int argc, char *argv[]) {
     set_client(port);
 
     signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
-
+    sem_create();
     while(1) {
         recv_client();
     }
