@@ -13,6 +13,7 @@ Semáforos, variables condición, mutex
 #define backlog 2000
 #define MAX_CLIENTS 250
 #define L_SIZE 1024
+#define SEM_VALUE_CLIENT 250
 
 int sockfd = 0, counter = 0, roll, num_clients = 0;
 int sock_cli[MAX_CLIENTS];
@@ -23,6 +24,8 @@ int connfd[MAX_CLIENTS];
 char fline[L_SIZE];
 
 FILE* file;
+
+sem_t sem_numero_clientes;
 
 struct request msg_recv;
 struct response msg_serv;
@@ -96,7 +99,8 @@ void recv_client() {
     struct timeval wait_time_init;
     struct timeval wait_time_end;
     /*Server is waiting for clients*/
-    
+    srand (time(NULL));
+
     connfd[num_clients] = accept(sockfd,(struct sockaddr *)NULL, NULL);
     if (connfd[num_clients] < 0) {
         close(sockfd);
@@ -110,7 +114,8 @@ void recv_client() {
     if (gettimeofday(&wait_time_init, 0) == -1) {
         error("Error getting stamp of time");
     }
-
+    
+    //Comienza la región crítica
     printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
     if (msg_recv.action == WRITE) {
         msg_serv.counter++;
@@ -127,8 +132,8 @@ void recv_client() {
     if (gettimeofday(&wait_time_end, 0) == -1) {
         error("Error getting stamp of time");
     }
-
-   int diff = ((wait_time_end.tv_sec - wait_time_init.tv_sec)*1000000 + wait_time_end.tv_usec) - wait_time_init.tv_usec;
+    int sleep_number = rand () % 25000 + 75000;
+    int diff = ((wait_time_end.tv_sec - wait_time_init.tv_sec)*1000000 + wait_time_end.tv_usec) - wait_time_init.tv_usec;
 
     msg_serv.action = msg_recv.action;
     msg_serv.waiting_time = diff * 1000;
@@ -139,6 +144,12 @@ void recv_client() {
     printf("SEND response COUNTER %d, WAITING TIME, %ld, ACTION, %d\n", msg_serv.counter, msg_serv.waiting_time, msg_serv.action);
     num_clients++;
 
+    //Fin de región critica
+
+}
+
+void sem_create() {
+    sem_init(&sem_numero_clientes, 0, 1);
 }
 
 int close_server() {
