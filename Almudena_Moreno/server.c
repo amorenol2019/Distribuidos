@@ -71,13 +71,12 @@ int main (int argc, char *argv[]) {
         error(RED USAGE RESET_COLOR);
     }
 
-    set_client(port);
+    set_server(port, priority);
 
     signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
     sem_create();
-    while(1) {
-        recv_client();
-    }
+
+    recv_client();
 
     return 0; 
 }

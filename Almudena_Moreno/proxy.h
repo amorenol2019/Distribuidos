@@ -31,8 +31,10 @@ void open_fd(char mode[2]);
 void write_fd();
 void read_fd();
 void sem_create();
+
+void close_thread();
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_client (unsigned int port);
+void set_server (unsigned int port, char *s_priority);
 
 int connect_server();
 
