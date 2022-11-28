@@ -42,10 +42,6 @@ pthread_cond_t  reader_cond, writer_cond;
 struct sockaddr_in sock;
 struct sockaddr_in sock_serv;
 
-struct request msg_client;
-struct response msg_resp;
-
-
 void error(char *message) {
     printf("%s\n", message);
     close_fd();
@@ -144,6 +140,10 @@ void set_server (unsigned int port, char *s_priority) {
 }
 
 void recv_client() {
+    int id_client[MAX_CLIENTS];
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        id_client[i] = i;
+    }
     /*Server is waiting for clients*/
     while(1) {
         connfd[num_clients] = accept(sockfd,(struct sockaddr *)NULL, NULL);
@@ -153,15 +153,14 @@ void recv_client() {
             error("Failed server accept...");
         }
         sem_wait(&sem_max_threads);
-        sem_wait(&mutex);
-        int id_client = num_clients;
-        pthread_create(&c_server[id_client], NULL, &communicate_client, (void *) &id_client);
+        //sem_wait(&mutex);
+        pthread_create(&c_server[id_client[num_clients]], NULL, &communicate_client, (void *) &id_client[num_clients]);
         num_clients++;
     }
 }
 
 void *communicate_client(void *arg) {
-    int id_num, connfd_, id_client;
+    int id_num, connfd_;
     struct timeval wait_time_init;
     struct timeval wait_time_end;
     struct request msg_recv;
@@ -169,7 +168,7 @@ void *communicate_client(void *arg) {
 
     memcpy(&id_num, (int *)arg, sizeof(int));  //copiar valor
     connfd_ = connfd[id_num];
-    sem_post(&mutex);
+    //sem_post(&mutex);
 
     if ((recv(connfd_, (void *) &msg_recv, sizeof(msg_recv), 0)) == -1) {
         error("Recv from the client failed...\n");
@@ -178,7 +177,7 @@ void *communicate_client(void *arg) {
     if (gettimeofday(&wait_time_init, 0) == -1) {
         error("Error getting stamp of time");
     }
-    memcpy(&id_client, &msg_recv.id, sizeof(int));
+    
     //WAITING TO ENTER TO CRITIC ZONE    
     if (msg_recv.action == WRITE) {
 
@@ -194,14 +193,13 @@ void *communicate_client(void *arg) {
 
         //Increase counter
         pthread_mutex_lock(&counter_mutex);
-
         if (gettimeofday(&wait_time_end, 0) == -1) {
             error("Error getting stamp of time");
         }
         serv_counter++;
         msg_serv.counter = serv_counter;
         printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
-        printf("[ESCRITOR #%d] modifica contador con valor %d\n", id_client, msg_serv.counter);
+        printf("[ESCRITOR #%d] modifica contador con valor %d\n", msg_recv.id, msg_serv.counter);
         pthread_mutex_unlock(&counter_mutex);
 
         //Edit file 
@@ -217,11 +215,11 @@ void *communicate_client(void *arg) {
         w_wait--;
         pthread_mutex_unlock(&counter_mutex);
         pthread_mutex_unlock(&mutex_file);
-        /*
+        
         if (w_wait == 0){
             pthread_cond_broadcast(&writer_cond);
         }
-        */
+        
         pthread_mutex_unlock(&mutex_prior);
     } else if (msg_recv.action == READ) {
         //Counter readers waiting
@@ -250,11 +248,12 @@ void *communicate_client(void *arg) {
         sem_post(&num_readers);
 
         printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
-        printf("[LECTOR #%d] lee contador con valor %d\n", id_client, serv_counter);
+        printf("[LECTOR #%d] lee contador con valor %d\n", msg_recv.id, serv_counter);
         msg_serv.counter = serv_counter;
         sem_post(&sem_readers);
 
         int sleep_number = rand () % 76 + 75;
+        
         usleep(sleep_number);
         pthread_mutex_unlock(&mutex_prior);
         sem_wait(&num_readers);
@@ -268,6 +267,7 @@ void *communicate_client(void *arg) {
         r_wait--;
         pthread_mutex_unlock(&counter_mutex);
 
+        
     } else {
         error("Not action allowed");
     }
@@ -279,7 +279,6 @@ void *communicate_client(void *arg) {
     if (send(connfd_, &msg_serv, sizeof(msg_serv), 0) < 0) {
         error("Send to server failed...\n");
     }
-
     sem_post(&sem_max_threads);
 
     //close_thread();
@@ -300,13 +299,13 @@ int close_server() {
     if(close(sockfd) == -1) {
         error("Close failed");
     }
-    
+    close_fd();
+
     return 0;
 }
 
 void ctrlHandlerServer(int num) {
     close_server();
-    close_fd();
     printf("\n");
     exit(EXIT_SUCCESS);
 }
@@ -367,6 +366,9 @@ void read_or_write(char* ip, int port, int threads, char* mode) {
 }
 
 void *connect_client(void *arg) {
+    struct request msg_client;
+    struct response msg_resp;
+
     int t_id = *(int *)arg;
     msg_client.action = roll;
     msg_client.id = t_id;
