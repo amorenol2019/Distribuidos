@@ -43,15 +43,15 @@ int main (int argc, char *argv[]) {
     while ((opt = getopt_long(argc, argv,"i:m:p:n:", 
                     long_options, &long_index )) != -1) {
         switch (opt) {
-             case 'i' : ip = optarg;
-                 break;
-             case 'm' : mode = optarg;
-                 break;
-             case 'p' : port = atoi(optarg); 
-                 break;
-             case 'n' : num_threads = atoi(optarg);
-                 break;
-             default: error(RED USAGE RESET_COLOR); 
+            case 'i' : ip = optarg;
+                break;
+            case 'm' : mode = optarg;
+                break;
+            case 'p' : port = atoi(optarg); 
+                break;
+            case 'n' : num_threads = atoi(optarg);
+                break;
+            default: error(RED USAGE RESET_COLOR);
         }
     }
 
