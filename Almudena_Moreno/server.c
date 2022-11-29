@@ -30,7 +30,7 @@ TIEMPO DE ESPERA: desde que intenta entrar en la región crítica, hasta que ent
 
 #define RED "\x1b[31m"
 #define RESET_COLOR    "\x1b[0m"
-#define USAGE  "Incorrect program call.\nUsage: ./server --port PORT --priority writer/reader (optional) --ratio NUM_RATIO"
+#define USAGE  "Incorrect program call.\nUsage: ./server --port PORT --priority writer/reader (optional) --ratio NUM_RATIO\n"
 
 
 int main (int argc, char *argv[]) {
@@ -38,11 +38,11 @@ int main (int argc, char *argv[]) {
 
     int opt = 0, long_index = 0;
     char *priority;
-    int port, num_ratio;
-    //signal(SIGINT, ctrlHandler);   //Close with CTRL + C
+    int port, num_ratio = -1;
 
     if(argc != 5 && argc != 7) {
-        error(RED USAGE RESET_COLOR);
+        printf(RED USAGE RESET_COLOR);
+        exit(EXIT_FAILURE);
     }
 
     static struct option long_options[] =
@@ -55,15 +55,27 @@ int main (int argc, char *argv[]) {
 
     while ((opt = getopt_long(argc, argv,"o:i:r:", 
                     long_options, &long_index )) != -1) {
+        const char *tmp_optarg = optarg;
         switch (opt) {
             case 'o' : port = atoi(optarg);
                 break;
             case 'i' : priority = optarg;
                 break;
-            case 'r' : num_ratio = atoi(optarg); 
+            case 'r' : 
+                if(!optarg && NULL != argv[optind] && '-' != argv[optind][0]) {
+                    tmp_optarg = argv[optind++];
+                }
+                if (tmp_optarg) {
+                    num_ratio = atoi(tmp_optarg);
+                    if (num_ratio == 0) {
+                        printf(RED "RATIO COULD NOT BE 0.\n" RESET_COLOR);
+                        exit(EXIT_FAILURE);
+                    }
+                }
                 break;
             default:
-                error(RED USAGE RESET_COLOR); 
+                printf(RED USAGE RESET_COLOR);
+                exit(EXIT_FAILURE);
         }
     }
 
@@ -71,7 +83,7 @@ int main (int argc, char *argv[]) {
         error(RED USAGE RESET_COLOR);
     }
 
-    set_server(port, priority);
+    communicate_server(port, priority, num_ratio);
 
     signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
     sem_create();

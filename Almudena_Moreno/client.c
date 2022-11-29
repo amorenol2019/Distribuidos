@@ -19,7 +19,7 @@ Cada thread lanzado y ejecutado:
 
 #define RED "\x1b[31m"
 #define RESET_COLOR    "\x1b[0m"
-#define USAGE  "Incorrect program call.\nUsage: ./client --ip IP --port PORT --mode writer/reader --threads NUM_THREADS"
+#define USAGE  "Incorrect program call.\nUsage: ./client --ip IP --port PORT --mode writer/reader --threads NUM_THREADS\n"
 
 int main (int argc, char *argv[]) {
     setbuf(stdout, NULL);
@@ -29,7 +29,8 @@ int main (int argc, char *argv[]) {
     int port, num_threads;
 
     if(argc != 9) {
-        error(RED USAGE RESET_COLOR);
+        printf(RED USAGE RESET_COLOR);
+        exit(EXIT_FAILURE);
     }
     static struct option long_options[] =
     {
@@ -51,12 +52,20 @@ int main (int argc, char *argv[]) {
                 break;
             case 'n' : num_threads = atoi(optarg);
                 break;
-            default: error(RED USAGE RESET_COLOR);
+            default:
+                printf(RED USAGE RESET_COLOR);
+                exit(EXIT_FAILURE);
         }
     }
 
+    if (num_threads > 1000) {
+        printf(RED USAGE RESET_COLOR);
+        exit(EXIT_FAILURE);
+    }
+
     if ((strcmp(mode, "writer") != 0) && (strcmp(mode, "reader") != 0)) {
-        error(RED USAGE RESET_COLOR);
+        printf(RED USAGE RESET_COLOR);
+        exit(EXIT_FAILURE);
     }
 
     signal(SIGINT, ctrlHandler);   //Close with CTRL + C

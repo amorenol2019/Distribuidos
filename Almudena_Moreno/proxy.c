@@ -2,12 +2,6 @@
 Almudena Moreno Lopez
 Sistemas Distribuidos y Concurrentes
 Práctica 3. Proxy
-
-
-Semáforos, variables condición, mutex
-Un mutex no vale para sincronización, sirve para excluir uno a uno
-VARIALES CONDICION: Un escritor no puede liberar solamente a un lector
-sI NO HAY ESCRITORIES, LOS LECTORES NO SE TIENEN QUE BLOQUEAR
 */
 
 #include "proxy.h"
@@ -17,32 +11,29 @@ sI NO HAY ESCRITORIES, LOS LECTORES NO SE TIENEN QUE BLOQUEAR
 #define MAX_CLIENTS 1000
 #define L_SIZE 1024
 
-int sockfd = 0, serv_counter, priority, roll, num_clients = 0, r_wait = 0, w_wait = 0;
-int n_readers = 0, n_clear_threads = 0;
-int total_threads = 0;
+//SERVER VARIABLES
+int n_readers = 0, ratio, n_writers = 0, serv_counter, priority, roll, r_wait = 0, w_wait = 0;
+int ratio_reader = 0, ratio_writer = 0;
+
+//CLIENT VARIABLES
 int sock_cli[MAX_CLIENTS];
-int connfd[MAX_CLIENTS];
+int total_threads = 0;
 
-int connfd_socket;
-
-//pthread_t c_server[MAX_CLIENTS];
+//OTHERS
+int sockfd = 0;
 
 char fline[L_SIZE];
-char fline[L_SIZE];
-
 FILE* file;
 
 sem_t sem_max_threads;
-sem_t mutex;
 
-sem_t sem_readers;
-sem_t num_readers;
-
-pthread_mutex_t mutex_file, counter_mutex, mutex_prior;
+pthread_mutex_t counter_mutex, mutex_prior;
 pthread_cond_t  reader_cond, writer_cond;
 
 struct sockaddr_in sock;
 struct sockaddr_in sock_serv;
+
+/*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 
 void error(char *message) {
     printf("%s\n", message);
@@ -76,17 +67,28 @@ void read_fd() {
     }
 }
 
+void sem_create() {
+    sem_init(&sem_max_threads, 0, MAX_THREADS);
+}
+
+void sleep_random() {
+    int sleep_number = rand () % 76 + 75;
+    usleep(sleep_number * 1000);
+}
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_server (unsigned int port, char *s_priority) {
-    const int enable = 1;
-
-    srand(time(NULL));
-
+void decide_priority(char *s_priority) {
     if (strcmp(s_priority, "reader") == 0) {
         priority = 0;
     } else {
         priority = 1;
     }
+}
+
+void set_server (unsigned int port, char *s_priority, int n_ratio) {
+    srand(time(NULL));
+
+    decide_priority(s_priority);
+    ratio = n_ratio;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -97,7 +99,13 @@ void set_server (unsigned int port, char *s_priority) {
     sock_serv.sin_family = AF_INET;
     sock_serv.sin_addr.s_addr = htonl(INADDR_ANY);
     sock_serv.sin_port = htons(port);
-    
+}
+
+void communicate_server(unsigned int port, char *s_priority, int n_ratio) {
+    const int enable = 1;
+
+    set_server(port, s_priority, n_ratio);
+
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         close_server();
         error("setsockopt(SO_REUSEADDR) failed");
@@ -122,7 +130,6 @@ void recv_client() {
         sem_wait(&sem_max_threads);
         pthread_t c_server;
         pthread_create(&c_server, NULL, &communicate_client, NULL);
-        num_clients++;
     }
 }
 
@@ -139,9 +146,7 @@ void *communicate_client(void *arg) {
         close(connfd_);
         error("Failed server accept...");
     }
-    
-    //memcpy(&connfd_, (int *)arg, sizeof(int));  // wait until finish copiar valor  
-    
+        
     if ((recv(connfd_, (void *) &msg_recv, sizeof(msg_recv), 0)) == -1) {
         error("Recv from the client failed...\n");
     }
@@ -152,39 +157,51 @@ void *communicate_client(void *arg) {
     
     //WAITING TO ENTER TO CRITIC ZONE    
     if (msg_recv.action == WRITE) {
-
         pthread_mutex_lock(&counter_mutex);
         w_wait++;  //Num of writers waiting
         pthread_mutex_unlock(&counter_mutex);
 
-        pthread_mutex_lock(&mutex_prior);   //Will wait until there are no more readers
-        
-        while (priority == 0 && r_wait != 0){
-            pthread_cond_wait(&reader_cond, &mutex_prior);
+        pthread_mutex_lock(&mutex_prior);   //Will wait until there are no more readers or optional ratio
+        if (priority == 0) {  //Priority readers
+            if (ratio != -1) {   //OPTIONAL ARGUMENT
+                while ((ratio_reader == 0) && (r_wait != 0 || n_readers != 0)){
+                    pthread_cond_wait(&writer_cond, &mutex_prior);
+                } 
+            } else {    //NOT OPTIONAL ARGUMENT RATIO
+                while (r_wait != 0) {
+                    pthread_cond_wait(&writer_cond, &mutex_prior);
+                } 
+            }
+        }  else if (priority == 1) {  //Priority writers
+            while (ratio != -1 && ratio_writer == 1 && r_wait != 0) {
+                pthread_cond_wait(&writer_cond, &mutex_prior);
+            }
         }
 
         //Increase counter and edit file    
-        //Edit file 
         if (gettimeofday(&wait_time_end, 0) == -1) {
             error("Error getting stamp of time");
         }
-        printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
-        printf("[ESCRITOR #%d] modifica contador con valor %d\n", msg_recv.id, ++serv_counter);
+        
+        printf("[%ld.%ld][ESCRITOR #%d] modifica contador con valor %d\n", wait_time_init.tv_sec, wait_time_init.tv_usec, msg_recv.id, ++serv_counter);
         msg_serv.counter = serv_counter;
         close_fd();
         open_fd("w");
         write_fd();
-        int sleep_number = rand () % 76 + 75;
-        usleep(sleep_number * 1000);
+        sleep_random();
 
-        pthread_mutex_lock(&counter_mutex);
         w_wait--;
-        pthread_mutex_unlock(&counter_mutex);
+        n_writers++;
 
-        if (w_wait == 0){
-            pthread_cond_broadcast(&writer_cond);
+        if (ratio != -1 && (n_writers % ratio) == 0 && priority == 1 && r_wait != 0) {
+            ratio_writer = 1;
+            pthread_cond_signal(&reader_cond);
         }
-
+        if ((ratio != -1 && ratio_reader == 1 && priority == 0) || (w_wait == 0)) {
+            ratio_reader = 0;
+            n_writers = 0;
+            pthread_cond_broadcast(&reader_cond);
+        } 
         pthread_mutex_unlock(&mutex_prior);
 
     } else if (msg_recv.action == READ) {
@@ -194,29 +211,45 @@ void *communicate_client(void *arg) {
         pthread_mutex_unlock(&counter_mutex);
 
         pthread_mutex_lock(&mutex_prior);
-        while (priority == 1 && w_wait != 0){   //Will wait until there are no more writers
-            pthread_cond_wait(&writer_cond, &mutex_prior);
-        }
+        if (priority == 1) {
+            if (ratio == -1) {
+                while (w_wait != 0){   //Will wait until there are no more writers
+                    pthread_cond_wait(&reader_cond, &mutex_prior);
+                } 
+            } else {
+                while (ratio_writer == 0 && (w_wait != 0 || n_writers != 0)){    //OPTINAL ARGUMENT RATIO
+                    pthread_cond_wait(&reader_cond, &mutex_prior);
+                }  
+            }
+        } else if (priority == 0){
+            while (ratio != -1 && ratio_reader == 1 && w_wait != 0) {   //Will wait until there are no more writers
+                pthread_cond_wait(&reader_cond, &mutex_prior);
+            }
+        } 
 
         //Increase counter
         if (gettimeofday(&wait_time_end, 0) == -1) {
             error("Error getting stamp of time");
         }
-        
-        printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
-        printf("[LECTOR #%d] lee contador con valor %d\n", msg_recv.id, serv_counter);
+
+        printf("[%ld.%ld][LECTOR #%d] lee contador con valor %d\n", wait_time_init.tv_sec, wait_time_init.tv_usec, msg_recv.id, serv_counter);
         msg_serv.counter = serv_counter;
-        int sleep_number = rand () % 76 + 75;
-        usleep(sleep_number * 1000);
+        sleep_random();
 
-        pthread_mutex_lock(&counter_mutex);
         r_wait--;
-        pthread_mutex_unlock(&counter_mutex);
+        n_readers++;
 
-        if (r_wait == 0){
-            pthread_cond_broadcast(&reader_cond);
+        if (ratio != -1 && (n_readers % ratio) == 0 && priority == 0 && w_wait != 0) {
+            ratio_reader = 1;
+            pthread_cond_signal(&writer_cond);
         }
+        if ((ratio != -1 && ratio_writer == 1 && priority == 1) || (r_wait == 0)) {
+            ratio_writer = 0;
+            n_readers = 0;
+            pthread_cond_broadcast(&writer_cond);
+        } 
         pthread_mutex_unlock(&mutex_prior);
+
     } else {
         error("Not action allowed");
     }
@@ -230,40 +263,45 @@ void *communicate_client(void *arg) {
         error("Send to server failed...\n");
     }
 
-    close(connfd_);
-    sem_post(&sem_max_threads);
-
+    close_each_thread(connfd_);
     //Fin de región critica
 
     return 0;
 }
 
-void sem_create() {
-    sem_init(&sem_max_threads, 0, MAX_THREADS);
-    sem_init(&sem_readers, 0, 1);
-    sem_init(&mutex, 0, 1);
+void close_each_thread(int connfd_socket) {
+    if (close(connfd_socket) == -1) {
+        error("ERROR Closing socket client");
+    }
+    sem_post(&sem_max_threads);
+    pthread_exit(0);
 }
 
 int close_server() {
     if(close(sockfd) == -1) {
         error("Close failed");
     }
-    close_fd();
 
     return 0;
 }
 
 void ctrlHandlerServer(int num) {
     close_server();
+
+    close_fd();
+
+    pthread_mutex_destroy(&mutex_prior);
+    pthread_mutex_destroy(&counter_mutex);
+    pthread_cond_destroy(&reader_cond);
+    pthread_cond_destroy(&writer_cond);
+    sem_destroy(&sem_max_threads);
+    
+
     printf("\n");
     exit(EXIT_SUCCESS);
 }
 
 /*/////////////////////////////---------------------CLIENTS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-
-/*Cuando este leyendo, variable que sea true lectores, y cuando cambie a escritores que cambie para
-saber cuando tengo que volver a leer del fichero*/
-
 void set_ip_port (char* ip, unsigned int port) {
     bzero(&sock, sizeof(sock));
     sock.sin_family = AF_INET;
@@ -271,7 +309,7 @@ void set_ip_port (char* ip, unsigned int port) {
     sock.sin_port = htons(port);
 }
 
-int create_socket(int id) {
+int create_socket() {
     const int enable = 1;
     int socket_cli;
     socket_cli = socket(AF_INET, SOCK_STREAM, 0);
@@ -301,9 +339,7 @@ void read_or_write(char* ip, int port, int threads, char* mode) {
     int id_thread[threads];
     for (int i = 0; i < threads; i++) {
         id_thread[i] = i;
-    }
-    for (int i = 0; i < threads; i++) {
-        pthread_create(&clients[total_threads++], NULL, &connect_client, (void *) &id_thread[i]);
+        pthread_create(&clients[id_thread[i]], NULL, &connect_client, (void *) &id_thread[i]);
     }
     
     for(int i = 0; i < threads; i++) {
@@ -322,7 +358,7 @@ void *connect_client(void *arg) {
     msg_client.action = roll;
     msg_client.id = t_id;
 
-    sock_cli[t_id] = create_socket(t_id);
+    sock_cli[t_id] = create_socket();
     if((connect(sock_cli[t_id], (struct sockaddr*)&sock, sizeof(sock))) == -1) {
         error("Connection with the server failed...");
     }
@@ -333,8 +369,6 @@ void *connect_client(void *arg) {
     if (send(sock_cli[t_id], &msg_client, sizeof(msg_client), 0) == -1) {
         printf("Send to server failed...\n");
     }
-    //printf("[CLIENT #%d] Send %d\n", msg_client.id, msg_client.action);
-
 
     if ((recv(sock_cli[t_id], (void *) &msg_resp, sizeof(msg_resp), 0)) == -1) {
         error("Receive message failed...");
@@ -347,18 +381,16 @@ void *connect_client(void *arg) {
             printf("Response action %d\n", msg_resp.action);
         }
     }
+    close_client(t_id);
 
     return 0;
 }
 
 int close_client(int id){
-    if(close(sock_cli[id]) == -1) {
-        error("Close failed");
-    }
-
+    close(sock_cli[id]);
+    
     return 0;
 }
-
 
 void ctrlHandler(int num) {
     close_client(serv_counter);

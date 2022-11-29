@@ -25,31 +25,33 @@ struct response {
     long waiting_time;        //Tiempo que ha esperado para llevar a cabo su 'action'
 };
 
+/*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void error(char *message);
-void close_fd();
 void open_fd(char mode[2]);
+void close_fd();
 void write_fd();
 void read_fd();
 void sem_create();
 
-void close_thread();
+void sleep_random();
 /*////////////////////////////---------------------SERVER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_server (unsigned int port, char *s_priority);
-
-int connect_server();
+void set_server (unsigned int port, char *s_priority, int n_ratio);
+void communicate_server(unsigned int port, char *s_priority, int n_ratio);
 
 void recv_client();
 void *communicate_client(void *arg);
 
-int notify_shutdown_now(char name[2]);
-
 int close_server();
+
+void close_each_thread(int connfd_socket);
 
 void ctrlHandlerServer(int num);
 
+void errorServer(char *message, int create);
+
 /*////////////////////////////---------------------CLIENT---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port (char* ip, unsigned int port);
-int create_socket(int id);
+int create_socket();
 void *connect_client();
 void read_or_write(char* ip, int port, int threads, char* mode);
 
@@ -58,6 +60,6 @@ void notify_ready_shutdown();
 void recv_shutdown_now(char id_client[2]);
 void *msg_shutdown(void *idc);
 
-int close_client(int id);
+int close_client();
 
 void ctrlHandler(int num);
