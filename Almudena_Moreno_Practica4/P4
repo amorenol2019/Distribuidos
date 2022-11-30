@@ -1,0 +1,11 @@
+Solo acepta 10 topics activos. Deja de existir cuando no hay publicadores ni suscriptores asociados a ese topic.
+
+Si mando 40, error.
+Si yo escribo al topic A, y no puedo recibirlo uno que esté en el B.
+
+Evaluación
+Buscar maquinas que estén bien sincronizadas.
+Salidaa estandar guardada en fichero: cual es el mensaje y la latencia
+Fichero CSV, 9 lineas como máximo
+Por cada modo, el ejemplo de la práctica
+Desviación estandar, como de dispersos están los datos
