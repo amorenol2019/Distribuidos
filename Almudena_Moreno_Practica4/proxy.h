@@ -20,11 +20,11 @@ enum operations {
 };
 struct publish {
     struct timespec time_generated_data;
-    char[100] data;
+    char data[100];
 };
 struct message {
     enum operations action;
-    char[100] topic;
+    char topic[100];
     // Solo utilizado en mensajes de UNREGISTER
     int id;
     // Solo utilizado en mensajes PUBLISH_DATA
@@ -62,10 +62,10 @@ int close_server();
 void ctrlHandlerBroker(int num);
 
 /*////////////////////////////---------------------PUBLISHER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_ip_port (char* ip, unsigned int port);
+void set_ip_port ();
 int create_socket();
-void *connect_client();
-//void read_or_write(char* ip, int port, int threads, char* mode);
+void read_or_write(char* ip_client, int port_client, char topic[], char* mode);
+void *connect_publisher(void *arg);
 int close_client();
 
 void ctrlHandler(int num);

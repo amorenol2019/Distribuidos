@@ -52,5 +52,6 @@ int main (int argc, char *argv[]) {
     }
 
     communicate_server(port);
+    recv_client();
     return 0;
 }
