@@ -210,7 +210,10 @@ void *communicate_client(void *arg) {
         r_wait++;  //Num of readers waiting
         pthread_mutex_unlock(&counter_mutex);
 
-        pthread_mutex_lock(&mutex_prior);
+        if (ratio != -1) {
+            pthread_mutex_lock(&mutex_prior);
+        }
+        
         if (priority == 1) {
             if (ratio == -1) {
                 while (w_wait != 0){   //Will wait until there are no more writers
@@ -248,7 +251,10 @@ void *communicate_client(void *arg) {
             n_readers = 0;
             pthread_cond_broadcast(&writer_cond);
         } 
-        pthread_mutex_unlock(&mutex_prior);
+
+        if (ratio != -1 ) {
+            pthread_mutex_unlock(&mutex_prior);
+        }
 
     } else {
         error("Not action allowed");
@@ -294,7 +300,7 @@ void ctrlHandlerServer(int num) {
     pthread_mutex_destroy(&counter_mutex);
     pthread_cond_destroy(&reader_cond);
     pthread_cond_destroy(&writer_cond);
-    sem_destroy(&sem_max_threads);
+    //sem_destroy(&sem_max_threads);
     
 
     printf("\n");

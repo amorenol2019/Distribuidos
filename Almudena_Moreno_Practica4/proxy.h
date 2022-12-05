@@ -36,9 +36,15 @@ enum status {
     LIMIT,
     OK
 };
+
 struct response {
     enum status response_status;
     int id;
+};
+
+struct n_sub_pub {
+    int pub;
+    int sub;
 };
 
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/

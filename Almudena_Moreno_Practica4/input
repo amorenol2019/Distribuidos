@@ -1,0 +1,4 @@
+./broker --port 8080 --mode secuencial
+
+./subscriber --ip 127.0.0.1 --port 8080 --topic H
+./publisher --ip 127.0.0.1 --port 8080 --topic H

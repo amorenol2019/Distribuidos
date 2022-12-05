@@ -15,6 +15,7 @@ NUNCA MUEREN, SOLO CUANDO HAGO CTRL+C
 #define MAX_CLIENTS 1000
 #define MAX_LIMIT_PUB 100
 #define MAX_LIMIT_SUB 900
+#define MAX_LIMIT_TOPICS 10
 
 //OTHERS
 int sockfd = 0;
@@ -24,7 +25,10 @@ struct sockaddr_in sock;
 struct sockaddr_in sock_serv;
 
 //SERVER VARIABLES
-int connfd, counter_pub = 0, counter_sub = 0;
+int connfd, counter_pub = 0, counter_sub = 0, counter_topics = 0;
+
+char topics[MAX_LIMIT_TOPICS][100];
+struct n_sub_pub count_topic[MAX_LIMIT_TOPICS];
 
 //CLIENT VARIABLES
 int sock_cli, port_c;
@@ -90,10 +94,46 @@ void recv_client() {
     }
 }
 
+int exists(char topic[100], char* type) {
+    int return_value = 1, n_pub, n_sub;
+    printf("Resumen: \n");
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(topic, topics[i]) == 0) {
+            return_value = 0;
+            if (strcmp(type, "Publicador") == 0) {
+                count_topic[i].pub++;
+            } else if (strcmp(type, "Suscriptor") == 0) {
+                count_topic[i].sub++;
+            }
+        }
+        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i], count_topic[i].sub, count_topic[i].pub);
+    }
+
+    return return_value;
+}
+
 void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type) {
     struct response msg_response;
 
     printf("(%d) %s conectado : %s\n", counter, type, msg_recv.topic);
+
+    if (exists(msg_recv.topic, type) == 1 && counter_topics < MAX_LIMIT_TOPICS) {
+        sprintf(topics[counter_topics], msg_recv.topic);
+        struct n_sub_pub new_topic;
+        if (strcmp(type, "Publicador") == 0) {
+            new_topic.pub = 1;
+            new_topic.sub = 0;
+        } else if (strcmp(type, "Suscriptor") == 0) {
+            new_topic.pub = 0;
+            new_topic.sub = 1;
+        }
+        count_topic[counter_topics] = new_topic;
+        printf("%s: %d Suscriptores - %d Publicadores\n", msg_recv.topic, count_topic[counter_topics].sub, count_topic[counter_topics].pub);
+        counter_topics++;
+    } else if (counter_topics == MAX_LIMIT_TOPICS) {
+        error("You cannot use more topics\n");
+    }
+
     if (counter == limit - 1) {
         msg_response.response_status = LIMIT;
     } else {
@@ -107,7 +147,6 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
 
 void *communicate_client(void *arg) {
     int connfd_ = *(int *) arg;
-    char* mode;
     struct message msg_recv;
     struct timeval wait_time_init;
 
@@ -117,14 +156,13 @@ void *communicate_client(void *arg) {
     if ((recv(connfd_, (void *) &msg_recv, sizeof(msg_recv), 0)) == -1) {
         error("Recv from the client failed...\n");
     }
+    
     printf("[%ld.%ld] Nuevo cliente ", wait_time_init.tv_sec, wait_time_init.tv_usec);
     if (msg_recv.action == REGISTER_PUBLISHER) {
-        mode = "Publicador";
         send_message(counter_pub++, msg_recv, MAX_LIMIT_PUB, connfd_, "Publicador");
         
     } else if (msg_recv.action == REGISTER_SUBSCRIBER) {
-        mode = "Suscriptor";
-        send_message(++counter_sub, msg_recv, MAX_LIMIT_SUB, connfd_, "Subscriptor");
+        send_message(++counter_sub, msg_recv, MAX_LIMIT_SUB, connfd_, "Suscriptor");
     }
         
     
