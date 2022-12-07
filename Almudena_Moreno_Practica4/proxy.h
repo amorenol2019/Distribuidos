@@ -7,6 +7,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <time.h>
 
 #define RED "\x1b[31m"
 #define RESET_COLOR    "\x1b[0m"
@@ -67,7 +68,7 @@ int close_server();
 
 void ctrlHandlerBroker(int num);
 
-/*////////////////////////////---------------------PUBLISHER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+/*////////////////////////////---------------------CLIENTS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port ();
 int create_socket();
 void read_or_write(char* ip_client, int port_client, char topic[], char* mode);
@@ -76,3 +77,6 @@ int close_client();
 
 void ctrlHandler(int num);
 
+/*////////////////////////////---------------------PUBLISHER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+void send_publisher();
+void unregister();
