@@ -136,6 +136,19 @@ void recv_client() {
     }
 }
 
+void posting_sem_ratio( ) {
+    int max;
+    if (c_sem_waiting < ratio) {
+        max = c_sem_waiting;
+    } else {
+        max = ratio;
+    }
+    for (int i = 0; i < max; i++) {
+        c_sem_waiting--;
+        sem_post(&sem_ratio_reader);
+    }
+}
+
 void *communicate_client(void *arg) {
     int connfd_;
     struct timeval wait_time_init;
@@ -164,31 +177,22 @@ void *communicate_client(void *arg) {
         w_wait++;  //Num of writers waiting
         pthread_mutex_unlock(&counter_mutex);
 
-        pthread_mutex_lock(&mutex_prior);   //Will wait until there are no more readers or optional ratio
+        pthread_mutex_lock(&mutex_prior);
         if (priority == 0) {  //Priority readers
             if (ratio != -1) {   //OPTIONAL ARGUMENT
-                while ((ratio_reader == 0) && (r_wait != 0 || n_readers != 0)){       //Will wait until there are no more readers
+                while ((ratio_reader == 0) && (r_wait != 0 || n_readers != 0)){    //Will wait until there are no more readers
                     pthread_cond_wait(&writer_cond, &mutex_prior);
-                    if (r_wait == 0) {
-                        int max;
-                        if (c_sem_waiting < 20) {
-                            max = c_sem_waiting;
-                        } else {
-                            max = ratio;
-                        }
-                        for (int i = 0; i < max; i++) {
-                            c_sem_waiting--;
-                            sem_post(&sem_ratio_reader);
-                        }
+                    if (r_wait == 0) {        //If there are no more writers
+                        posting_sem_ratio();
                     }
                 } 
             } else {    //NOT OPTIONAL ARGUMENT RATIO
                 while (r_wait != 0) {
                     pthread_cond_wait(&writer_cond, &mutex_prior);
-                } 
+                }
             }
-        }  else if (priority == 1) {  //Priority writers
-            while (ratio != -1 && ratio_writer == 1 && r_wait != 0) {         //Will wait until there are no more readers
+        }  else if (priority == 1 && ratio != -1) {  //Priority writers and optinal argument
+            while (ratio_writer == 1 && r_wait != 0) {    //Will wait until a reader is unlocked. (RATIO)
                 pthread_cond_wait(&writer_cond, &mutex_prior);
             }
         }
@@ -208,26 +212,19 @@ void *communicate_client(void *arg) {
         w_wait--;
         n_writers++;
 
-        if (ratio != -1 && (n_writers % ratio) == 0 && priority == 1 && r_wait != 0) {
-            ratio_writer = 1;
-            pthread_cond_signal(&reader_cond);
-        } else if ((ratio != -1 && ratio_reader == 1 && priority == 0)) {
-            n_writers = 0;
-            if (ratio != -1 && r_wait != 0) {
-                int max;
-                if (c_sem_waiting < 20) {
-                    max = c_sem_waiting;
-                } else {
-                    max = ratio;
+        if (ratio != -1) {   //OPTIONAL ARGUMENT
+            if ((n_writers % ratio) == 0 && priority == 1 && r_wait != 0) {  //Priority writer, will enter a reader
+                ratio_writer = 1;
+                pthread_cond_signal(&reader_cond);
+            } else if (ratio_reader == 1 && priority == 0) {   //Priority reader, will enter n_ratio readers
+                n_writers = 0;
+                if (ratio != -1 && r_wait != 0) {
+                    posting_sem_ratio();
+                    ratio_reader = 0;
                 }
-                for (int i = 0; i < max; i++) {
-                    c_sem_waiting--;
-                    sem_post(&sem_ratio_reader);
-                }
-                ratio_reader = 0;
             }
         }
-        if (w_wait == 0) {
+        if (w_wait == 0) {    //When there are no more writers
             ratio_writer = 1;
             pthread_cond_broadcast(&reader_cond);
         }
@@ -253,7 +250,7 @@ void *communicate_client(void *arg) {
                     pthread_mutex_unlock(&reader);
                 } 
             } else {
-                while (w_wait != 0 && ratio_writer != 1){   //Will wait until there are no more writers
+                while (w_wait != 0 && ratio_writer != 1){   //Will wait until there are no more writers  OPTIONAL ARGUMENT
                     pthread_mutex_lock(&reader);
                     pthread_cond_wait(&reader_cond, &reader);
                     pthread_mutex_unlock(&reader);
@@ -276,15 +273,17 @@ void *communicate_client(void *arg) {
         pthread_mutex_unlock(&reader);
 
         pthread_mutex_lock(&reader);
-        if (r_wait == 0) {
+        if (r_wait == 0) {    //When there are no more readers
             ratio_reader = 1;
             pthread_cond_broadcast(&writer_cond);
-        } else if (ratio != -1 && (n_readers % ratio) == 0 && priority == 0 && w_wait != 0) {
-            ratio_reader = 1;
-            pthread_cond_signal(&writer_cond);
-        } else if ((ratio != -1 && ratio_writer == 1 && priority == 1 && w_wait != 0)) {
-            ratio_writer = 0;
-            pthread_cond_broadcast(&writer_cond);
+        } else if (ratio != -1) {
+            if ((n_readers % ratio) == 0 && priority == 0 && w_wait != 0) {   //Priority reader, will enter a writers
+                ratio_reader = 1;
+                pthread_cond_signal(&writer_cond);
+            } else if (ratio_writer == 1 && priority == 1 && w_wait != 0) {   //Priority writer, will enter a n_ratio writers
+                ratio_writer = 0;
+                pthread_cond_broadcast(&writer_cond);
+            }
         }
         pthread_mutex_unlock(&reader);
         
