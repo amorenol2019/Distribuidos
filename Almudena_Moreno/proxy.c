@@ -27,7 +27,7 @@ FILE* file;
 
 sem_t sem_max_threads;
 
-pthread_mutex_t counter_mutex, mutex_prior;
+pthread_mutex_t counter_mutex, mutex_prior, reader;
 pthread_cond_t  reader_cond, writer_cond;
 
 struct sockaddr_in sock;
@@ -155,7 +155,7 @@ void *communicate_client(void *arg) {
         error("Error getting stamp of time");
     }
     
-    //WAITING TO ENTER TO CRITIC ZONE    
+    //WAITING TO ENTER TO CRITIC ZONE
     if (msg_recv.action == WRITE) {
         pthread_mutex_lock(&counter_mutex);
         w_wait++;  //Num of writers waiting
@@ -164,7 +164,7 @@ void *communicate_client(void *arg) {
         pthread_mutex_lock(&mutex_prior);   //Will wait until there are no more readers or optional ratio
         if (priority == 0) {  //Priority readers
             if (ratio != -1) {   //OPTIONAL ARGUMENT
-                while ((ratio_reader == 0) && (r_wait != 0 || n_readers != 0)){
+                while ((ratio_reader == 0) && (r_wait != 0 || n_readers != 0)){       //Will wait until there are no more readers
                     pthread_cond_wait(&writer_cond, &mutex_prior);
                 } 
             } else {    //NOT OPTIONAL ARGUMENT RATIO
@@ -173,7 +173,7 @@ void *communicate_client(void *arg) {
                 } 
             }
         }  else if (priority == 1) {  //Priority writers
-            while (ratio != -1 && ratio_writer == 1 && r_wait != 0) {
+            while (ratio != -1 && ratio_writer == 1 && r_wait != 0) {         //Will wait until there are no more readers
                 pthread_cond_wait(&writer_cond, &mutex_prior);
             }
         }
@@ -202,33 +202,37 @@ void *communicate_client(void *arg) {
             n_writers = 0;
             pthread_cond_broadcast(&reader_cond);
         } 
+
         pthread_mutex_unlock(&mutex_prior);
 
     } else if (msg_recv.action == READ) {
         //Counter readers waiting
-        pthread_mutex_lock(&counter_mutex);
+        pthread_mutex_lock(&reader);
         r_wait++;  //Num of readers waiting
-        pthread_mutex_unlock(&counter_mutex);
+        pthread_mutex_unlock(&reader);
 
-        if (ratio != -1) {
-            pthread_mutex_lock(&mutex_prior);
-        }
-        
         if (priority == 1) {
             if (ratio == -1) {
+                //printf("--------------W WAITING %d PRIOR %d RATIO %d\n", w_wait, priority, ratio);
                 while (w_wait != 0){   //Will wait until there are no more writers
-                    pthread_cond_wait(&reader_cond, &mutex_prior);
+                    pthread_mutex_lock(&reader);
+                    pthread_cond_wait(&reader_cond, &reader);
+                    pthread_mutex_unlock(&reader);
                 } 
             } else {
                 while (ratio_writer == 0 && (w_wait != 0 || n_writers != 0)){    //OPTINAL ARGUMENT RATIO
-                    pthread_cond_wait(&reader_cond, &mutex_prior);
+                    pthread_mutex_lock(&reader);
+                    pthread_cond_wait(&reader_cond, &reader);
+                    pthread_mutex_unlock(&reader);
                 }  
             }
         } else if (priority == 0){
             while (ratio != -1 && ratio_reader == 1 && w_wait != 0) {   //Will wait until there are no more writers
-                pthread_cond_wait(&reader_cond, &mutex_prior);
+                pthread_mutex_lock(&reader);
+                pthread_cond_wait(&reader_cond, &reader);
+                pthread_mutex_unlock(&reader);
             }
-        } 
+        }
 
         //Increase counter
         if (gettimeofday(&wait_time_end, 0) == -1) {
@@ -239,9 +243,13 @@ void *communicate_client(void *arg) {
         msg_serv.counter = serv_counter;
         sleep_random();
 
+        pthread_mutex_lock(&reader);
         r_wait--;
         n_readers++;
+        //printf("READERS S------------------------------------------------------------- %d    %d    %d\n", n_readers, (n_readers % ratio), r_wait);
+        pthread_mutex_unlock(&reader);
 
+        pthread_mutex_lock(&counter_mutex);
         if (ratio != -1 && (n_readers % ratio) == 0 && priority == 0 && w_wait != 0) {
             ratio_reader = 1;
             pthread_cond_signal(&writer_cond);
@@ -250,12 +258,9 @@ void *communicate_client(void *arg) {
             ratio_writer = 0;
             n_readers = 0;
             pthread_cond_broadcast(&writer_cond);
-        } 
-
-        if (ratio != -1 ) {
-            pthread_mutex_unlock(&mutex_prior);
         }
-
+        pthread_mutex_unlock(&counter_mutex);
+        
     } else {
         error("Not action allowed");
     }
@@ -269,7 +274,9 @@ void *communicate_client(void *arg) {
         error("Send to server failed...\n");
     }
 
+    sem_post(&sem_max_threads);
     close_each_thread(connfd_);
+
     //Fin de región critica
 
     return 0;
@@ -279,7 +286,6 @@ void close_each_thread(int connfd_socket) {
     if (close(connfd_socket) == -1) {
         error("ERROR Closing socket client");
     }
-    sem_post(&sem_max_threads);
     pthread_exit(0);
 }
 
@@ -298,6 +304,8 @@ void ctrlHandlerServer(int num) {
 
     pthread_mutex_destroy(&mutex_prior);
     pthread_mutex_destroy(&counter_mutex);
+    pthread_mutex_destroy(&reader);
+
     pthread_cond_destroy(&reader_cond);
     pthread_cond_destroy(&writer_cond);
     //sem_destroy(&sem_max_threads);
