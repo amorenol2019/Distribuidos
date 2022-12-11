@@ -211,7 +211,7 @@ void *communicate_client(void *arg) {
         if (ratio != -1 && (n_writers % ratio) == 0 && priority == 1 && r_wait != 0) {
             ratio_writer = 1;
             pthread_cond_signal(&reader_cond);
-        } else if ((ratio != -1 && ratio_reader == 1 && priority == 0) || (w_wait == 0)) {
+        } else if ((ratio != -1 && ratio_reader == 1 && priority == 0)) {
             n_writers = 0;
             if (ratio != -1 && r_wait != 0) {
                 int max;
@@ -226,10 +226,12 @@ void *communicate_client(void *arg) {
                 }
                 ratio_reader = 0;
             }
-        } else if (w_wait == 0) {
+        }
+        if (w_wait == 0) {
+            ratio_writer = 1;
             pthread_cond_broadcast(&reader_cond);
         }
-        //printf("RATIO READER %d  R  %d\n", ratio_reader, r_wait);
+        
         pthread_mutex_unlock(&mutex_prior);
 
     } else if (msg_recv.action == READ) {
@@ -245,8 +247,13 @@ void *communicate_client(void *arg) {
 
         if (priority == 1) {
             if (ratio == -1) {
-                //printf("--------------W WAITING %d PRIOR %d RATIO %d\n", w_wait, priority, ratio);
                 while (w_wait != 0){   //Will wait until there are no more writers
+                    pthread_mutex_lock(&reader);
+                    pthread_cond_wait(&reader_cond, &reader);
+                    pthread_mutex_unlock(&reader);
+                } 
+            } else {
+                while (w_wait != 0 && ratio_writer != 1){   //Will wait until there are no more writers
                     pthread_mutex_lock(&reader);
                     pthread_cond_wait(&reader_cond, &reader);
                     pthread_mutex_unlock(&reader);
@@ -268,8 +275,6 @@ void *communicate_client(void *arg) {
         n_readers++;
         pthread_mutex_unlock(&reader);
 
-        //printf("READERS S----- %d    %d    %d\n", n_readers, (n_readers % ratio), r_wait);
-
         pthread_mutex_lock(&reader);
         if (r_wait == 0) {
             ratio_reader = 1;
@@ -277,10 +282,10 @@ void *communicate_client(void *arg) {
         } else if (ratio != -1 && (n_readers % ratio) == 0 && priority == 0 && w_wait != 0) {
             ratio_reader = 1;
             pthread_cond_signal(&writer_cond);
-        } else if ((ratio != -1 && ratio_writer == 1 && priority == 1)) {
+        } else if ((ratio != -1 && ratio_writer == 1 && priority == 1 && w_wait != 0)) {
             ratio_writer = 0;
+            pthread_cond_broadcast(&writer_cond);
         }
-
         pthread_mutex_unlock(&reader);
         
     } else {
