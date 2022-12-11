@@ -4,8 +4,8 @@ CC = gcc
 CFLAGS = -g -I. -Wall -Wshadow
 LIBRARY = -lpthread
 
-OBJ1 = client.c proxy_ratio.o
-OBJ2 = server.c proxy_ratio.o
+OBJ1 = client.c proxy.o
+OBJ2 = server.c proxy.o
 
 proxy.o: proxy.c proxy.h
 	$(CC) $(CFLAGS) $(LIBRARY) -c proxy.c 

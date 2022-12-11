@@ -13,7 +13,7 @@ Práctica 3. Proxy
 
 //SERVER VARIABLES
 int n_readers = 0, ratio, n_writers = 0, serv_counter, priority, roll, r_wait = 0, w_wait = 0;
-int ratio_reader = 0, ratio_writer = 0, c_sem_waiting = 0;
+int ratio_reader = 0, ratio_writer = 0, c_sem_waiting = 0, closed = 0;
 
 //CLIENT VARIABLES
 int sock_cli[MAX_CLIENTS];
@@ -121,7 +121,7 @@ void communicate_server(unsigned int port, char *s_priority, int n_ratio) {
         close_server();
         error("Listen failed...");
     }
-
+    closed = 1;
     open_fd("a+");
     read_fd();
 }
@@ -205,7 +205,9 @@ void *communicate_client(void *arg) {
         printf("[%ld.%ld][ESCRITOR #%d] modifica contador con valor %d\n", wait_time_init.tv_sec, wait_time_init.tv_usec, msg_recv.id, ++serv_counter);
         msg_serv.counter = serv_counter;
         close_fd();
+        closed = 0;
         open_fd("w");
+        closed = 1;
         write_fd();
         sleep_random();
 
@@ -300,11 +302,11 @@ void *communicate_client(void *arg) {
         error("Send to server failed...\n");
     }
 
-    sem_post(&sem_max_threads);
     close_each_thread(connfd_);
+    sem_post(&sem_max_threads);
+    pthread_exit(0);
 
     //Fin de región critica
-
     return 0;
 }
 
@@ -312,7 +314,6 @@ void close_each_thread(int connfd_socket) {
     if (close(connfd_socket) == -1) {
         error("ERROR Closing socket client");
     }
-    pthread_exit(0);
 }
 
 int close_server() {
@@ -325,8 +326,11 @@ int close_server() {
 
 void ctrlHandlerServer(int num) {
     close_server();
-
-    close_fd();
+    /*
+    if (closed != 0) {
+        close_fd();
+    }
+    */
 
     pthread_mutex_destroy(&mutex_prior);
     pthread_mutex_destroy(&counter_mutex);
@@ -334,7 +338,8 @@ void ctrlHandlerServer(int num) {
 
     pthread_cond_destroy(&reader_cond);
     pthread_cond_destroy(&writer_cond);
-    //sem_destroy(&sem_max_threads);
+    sem_destroy(&sem_ratio_reader);
+    sem_destroy(&sem_max_threads);
     
 
     printf("\n");
