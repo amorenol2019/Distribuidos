@@ -86,7 +86,6 @@ int main (int argc, char *argv[]) {
     communicate_server(port, priority, num_ratio);
 
     signal(SIGINT, ctrlHandlerServer);   //Close with CTRL + C
-    sem_create();
 
     recv_client();
 
