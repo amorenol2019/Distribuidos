@@ -28,8 +28,8 @@ struct sockaddr_in sock_serv;
 //SERVER VARIABLES
 int connfd, counter_pub = 0, counter_sub = 0, counter_topics = 0;
 
-char topics[MAX_LIMIT_TOPICS][100];
-struct n_sub_pub count_topic[MAX_LIMIT_TOPICS];
+struct n_topic topics[MAX_LIMIT_TOPICS];
+//struct n_sub_pub count_topic[MAX_LIMIT_TOPICS];
 
 //CLIENT VARIABLES
 int sock_cli, port_c;
@@ -48,13 +48,13 @@ void error(char *message) {
 }
 
 void take_time(){
-    struct timeval wait_time_init;
+    struct timespec wait_time_init;
 
-    if (gettimeofday(&wait_time_init, 0) == -1) {
+    if (timespec_get(&wait_time_init, TIME_UTC) == -1) {
         error("Error getting stamp of time");
     }
 
-    printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_usec);
+    printf("[%ld.%ld]", wait_time_init.tv_sec, wait_time_init.tv_nsec);
 }
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_server (unsigned int port) {
@@ -106,19 +106,27 @@ void recv_client() {
     }
 }
 
-int exists(char topic[100], char* type) {
-    int return_value = 1, n_pub, n_sub;
+/*
+-------------------
+AÑADIR NODE LAST
+AÑADIR NOMBRE TOPIC
+-------------------
+*/
+int exists(char topic[100], char* type, int fd) {
+    int return_value = 1;
     printf("Resumen: \n");
     for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(topic, topics[i]) == 0) {
+        if (strcmp(topic, topics[i].name) == 0) {
             return_value = 0;
             if (strcmp(type, "Publicador") == 0) {
-                count_topic[i].pub++;
+                topics[i].pub++;
             } else if (strcmp(type, "Suscriptor") == 0) {
-                count_topic[i].sub++;
+                topics[i].sub++;
             }
+            //last node topics[i] = fd;
         }
-        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i], count_topic[i].sub, count_topic[i].pub);
+        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
+        break; //i = counter_topics;
     }
 
     return return_value;
@@ -129,9 +137,10 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
 
     printf("(%d) %s conectado : %s\n", counter, type, msg_recv.topic);
 
-    if (exists(msg_recv.topic, type) == 1 && counter_topics < MAX_LIMIT_TOPICS) {
-        sprintf(topics[counter_topics], msg_recv.topic);
-        struct n_sub_pub new_topic;
+    //Topic does not exist and enough free n topics
+    if (exists(msg_recv.topic, type, connfd_send) == 1 && counter_topics < MAX_LIMIT_TOPICS) {
+        struct n_topic new_topic;
+        sprintf(new_topic.name, "%s", msg_recv.topic);
         if (strcmp(type, "Publicador") == 0) {
             new_topic.pub = 1;
             new_topic.sub = 0;
@@ -139,8 +148,17 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
             new_topic.pub = 0;
             new_topic.sub = 1;
         }
-        count_topic[counter_topics] = new_topic;
-        printf("%s: %d Suscriptores - %d Publicadores\n", msg_recv.topic, count_topic[counter_topics].sub, count_topic[counter_topics].pub);
+
+        struct Node t_node;
+        t_node.id = counter;
+        t_node.fd = connfd_send;
+        t_node.next = NULL;
+
+        new_topic.first = &t_node;
+        new_topic.last = &t_node;
+
+        topics[counter_topics] = new_topic;
+        printf("%s: %d Suscriptores - %d Publicadores\n", msg_recv.topic, topics[counter_topics].sub, topics[counter_topics].pub);
         counter_topics++;
     }
 
@@ -148,7 +166,7 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
         msg_response.response_status = LIMIT;
     } else {
         msg_response.response_status = OK;
-    }   
+    }
     msg_response.id = counter;
     if (send(connfd_send, &msg_response, sizeof(msg_response), 0) < 0) {
         error("Send to server failed...\n");
@@ -159,14 +177,14 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
 void print_list_topics(char* topic, char* type) {
     printf("Resumen: \n");
     for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(topic, topics[i]) == 0) {
+        if (strcmp(topic, topics[i].name) == 0) {
             if (strcmp(type, "Publicador") == 0) {
-                count_topic[i].pub--;
+                topics[i].pub--;
             } else if (strcmp(type, "Suscriptor") == 0) {
-                count_topic[i].sub--;
+                topics[i].sub--;
             }
         }
-        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i], count_topic[i].sub, count_topic[i].pub);
+        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
     }
 }
 
@@ -189,16 +207,12 @@ void receive_data(struct message receive) {
     strcpy(data, receive.data.data);
     time = receive.data.time_generated_data;
     printf(" Recibido mensaje para publicar en topic: %s -mensaje: %s - Generó: %ld.%ld\n", receive.topic, data, time.tv_sec, time.tv_nsec);
-}
-
-void sending_data() {
-    take_time();
-    printf(" Enviando mensaje en topic $TOPIC a $N suscriptores.");
+    //sending_data(receive);
 }
 
 
 void *communicate_client(void *arg) {
-    int connfd_ = *(int *) arg, unregistered = 0;;
+    int connfd_ = *(int *) arg, unregistered = 0;
     struct message msg_recv;
 
     
@@ -224,17 +238,51 @@ void *communicate_client(void *arg) {
             } 
             if (public_topic.action == PUBLISH_DATA) {
                 receive_data(public_topic);
+                sending_data(connfd_, public_topic);
+            } /*else if (public_topic.action == UNREGISTER_PUBLISHER) {
+                unregistered = 1;
+                unregister_publisher(public_topic, "Publicador");
+            }*/
+        }
+    } /* else if (msg_recv.action == REGISTER_SUBSCRIBER) {
+        while (!unregistered) {
+            struct publish public_topic;
+            if ((send(connfd_, (void *) &public_topic, sizeof(public_topic), 0)) == -1) {
+                error("Recv from the client failed...\n");
+            }
+            if (public_topic.action == PUBLISH_DATA) {
+                receive_data(public_topic);
             } else if (public_topic.action == UNREGISTER_PUBLISHER) {
                 unregistered = 1;
                 unregister_publisher(public_topic, "Publicador");
             }
         }
-    }
+    }*/
     
     close(connfd_);
         
 
     return 0;
+}
+
+void sending_data(int connfd_topic, struct message publish) {
+    int num_sub;
+    struct publish msg_topic;
+    
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(publish.topic, topics[i].name) == 0) {
+            num_sub = topics[i].sub;
+            break;
+        }
+    }
+    msg_topic = publish.data;
+
+    if (send(connfd_topic, &msg_topic, sizeof(msg_topic), 0) == -1) {
+        error("Send to server failed...\n");
+    }
+
+    take_time();
+    printf(" Enviando mensaje en topic %s a %d suscriptores.\n", publish.topic, num_sub);
 }
 
 /*
@@ -290,75 +338,24 @@ int create_socket() {
 }
 
 void read_or_write(char* ip_client, int port_client, char topic[], char* mode) {
-    int p_s;
     ip_c = ip_client;
     port_c = port_client;
     topic_client = topic;
     set_ip_port();
-
+    
+    strcpy(msg_register.topic, topic);
     if (strcmp(mode, "publisher") == 0) {
         msg_register.action = REGISTER_PUBLISHER;
-        p_s = 0;
+        pthread_create(&client, NULL, &connect_publisher, NULL);
     } else if (strcmp(mode, "subscriber") == 0) {
         msg_register.action = REGISTER_SUBSCRIBER;
-        p_s = 1;
+        pthread_create(&client, NULL, &connect_subscriber, NULL);
     }
-        
-    strcpy(msg_register.topic, topic);
-    
-    pthread_create(&client, NULL, &connect_publisher, &p_s);
     
     if(pthread_join(client, NULL) == -1) {
         printf("Error pthread_join...\n");
         exit(EXIT_FAILURE);
     }
-}
-
-void *connect_publisher(void *arg) {
-    int mode_p_s = *(int *) arg;
-    char* mode_string;
-    char end_line[50];
-    
-    sock_cli = create_socket();
-
-    if((connect(sock_cli, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
-        error("Connection with the server failed...");
-    }
-
-    if (mode_p_s == 0) {
-        mode_string = "Publisher";
-        sprintf(end_line, "\n");
-    } else if (mode_p_s == 1) {
-        mode_string = "Subscriber";
-        sprintf(end_line, "(%s:%d)\n", ip_c, port_c);
-    }
-
-    take_time();
-    printf(" %s conectado con el broker correctamente. %s", mode_string, end_line);
-
-    if (send(sock_cli, &msg_register, sizeof(msg_register), 0) == -1) {
-        printf("Send to server failed...\n");
-    }
-
-    if ((recv(sock_cli, (void *) &msg_resp, sizeof(msg_resp), 0)) == -1) {
-        error("Error receiving message from broker");
-    } else {
-        take_time();
-        if (msg_resp.response_status == OK) {
-            id_client = msg_resp.id;
-            printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
-        } else if (msg_resp.response_status == LIMIT) {
-            //char* message;
-            //sprintf(message, " Error al hacer el registro: error=%s", msg_resp.response_status);
-            error(" Error al hacer el registro: error=%s");
-        }
-    }
-    send_publisher();
-    sleep(3);
-    unregister();
-    close_client();
-
-    return 0;
 }
 
 int close_client(){
@@ -377,12 +374,6 @@ void open_fd(char mode[2]) {
     }
 }
 
-void close_fd() {
-    if (fclose(file) == EOF) {
-        error("Error closing file");
-    }
-}
-
 char* read_fd() {
     char fline[L_SIZE];
     char* msg;
@@ -393,6 +384,47 @@ char* read_fd() {
     }
 
     return msg;
+}
+
+void close_fd() {
+    if (fclose(file) == EOF) {
+        error("Error closing file");
+    }
+}
+
+void *connect_publisher(void *arg) {
+    sock_cli = create_socket();
+
+    if((connect(sock_cli, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
+        error("Connection with the server failed...");
+    }
+
+    take_time();
+    printf(" Publisher conectado con el broker correctamente.\n");
+
+    if (send(sock_cli, &msg_register, sizeof(msg_register), 0) == -1) {
+        printf("Send to server failed...\n");
+    }
+
+    if (recv(sock_cli, (void *) &msg_resp, sizeof(msg_resp), 0) == -1) {
+        error("Error receiving message from broker");
+    } else {
+        take_time();
+        if (msg_resp.response_status == OK) {
+            id_client = msg_resp.id;
+            printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
+        } else if (msg_resp.response_status == LIMIT) {
+            //char* message;
+            //sprintf(message, " Error al hacer el registro: error=%s", msg_resp.response_status);
+            error(" Error al hacer el registro: error=%s");
+        }
+    }
+    send_publisher();
+    sleep(6);
+    //pub_unregister();
+    close_client();
+
+    return 0;
 }
 
 void send_publisher() {
@@ -423,7 +455,7 @@ void send_publisher() {
     printf(" Publicado mensaje topic: %s - mensaje: %s - Generó: %ld.%ld\n", msg_publisher.topic, data_published.data, publish_time.tv_sec, publish_time.tv_nsec);
 }
 
-void unregister() {
+void pub_unregister() {
     struct message msg_publisher;
 
     msg_publisher.action = UNREGISTER_PUBLISHER;
@@ -441,3 +473,54 @@ void unregister() {
 /*printf([SECONDS.NANOSECONDS] Recibido mensaje topic: $topic - mensaje: $data -
 Generó: $time_generated_data - Recibido: $time_received_data - Latencia:
 $latency.) */
+void receive_topic() {
+    struct message msg_publisher;
+    if (recv(sock_cli, (void *) &msg_publisher, sizeof(msg_publisher), 0) == -1) {
+        printf("Send to server failed...\n");
+    }
+    take_time();
+    printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: $time_received_data - Latencia: $latency.", msg_publisher.topic, msg_publisher.data.data, msg_publisher.data.time_generated_data.tv_sec, msg_publisher.data.time_generated_data.tv_nsec);
+}   
+
+void sub_unregister() {
+    printf("HOLA");
+}
+
+void *connect_subscriber(void *arg) {
+   
+    sock_cli = create_socket();
+
+    if((connect(sock_cli, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
+        error("Connection with the server failed...");
+    }
+    
+    take_time();
+    printf(" Subscriber conectado con el broker correctamente. (%s:%d)\n", ip_c, port_c);
+
+    if (send(sock_cli, &msg_register, sizeof(msg_register), 0) == -1) {
+        printf("Send to server failed...\n");
+    }
+
+    if ((recv(sock_cli, (void *) &msg_resp, sizeof(msg_resp), 0)) == -1) {
+        error("Error receiving message from broker");
+    } else {
+        take_time();
+        if (msg_resp.response_status == OK) {
+            id_client = msg_resp.id;
+            printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
+        } else if (msg_resp.response_status == LIMIT) {
+            //char* message;
+            //sprintf(message, " Error al hacer el registro: error=%s", msg_resp.response_status);
+            error(" Error al hacer el registro: error=%s");
+        }
+    }
+    
+    receive_topic();
+    sleep(3);
+    /*
+    sub_unregister();
+    */
+    close_client();
+
+    return 0;
+}

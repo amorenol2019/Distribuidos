@@ -43,17 +43,23 @@ struct response {
     int id;
 };
 
-struct n_sub_pub {
+struct n_topic {
+    char name[100];
     int pub;
     int sub;
+    struct Node* first;
+    struct Node* last;
+};
+
+struct Node {
+    int id;
+    int fd;
+    struct Node* next;
 };
 
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void error(char *message);
-//void open_fd(char mode[2]);
-//void close_fd();
-//void write_fd();
-//void read_fd();
+void take_time();
 
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_server (unsigned int port);
@@ -61,10 +67,14 @@ void communicate_server(unsigned int port);
 
 void recv_client();
 void *communicate_client(void *arg);
+int exists(char topic[100], char* type, int fd);
+void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type);
+void print_list_topics(char* topic, char* type);
+void unregister_publisher(struct message receive, char* type);
+void receive_data(struct message receive);
+void sending_data(int connfd_topic, struct message publish);
 
 int close_server();
-
-//void close_each_thread(int connfd_socket);
 
 void ctrlHandlerBroker(int num);
 
@@ -72,11 +82,20 @@ void ctrlHandlerBroker(int num);
 void set_ip_port ();
 int create_socket();
 void read_or_write(char* ip_client, int port_client, char topic[], char* mode);
-void *connect_publisher(void *arg);
 int close_client();
 
-void ctrlHandler(int num);
+//void ctrlHandler(int num);
 
 /*////////////////////////////---------------------PUBLISHER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+void open_fd(char mode[2]);
+char* read_fd();
+void close_fd();
+
+void *connect_publisher(void *arg);
 void send_publisher();
-void unregister();
+void pub_unregister();
+
+/*////////////////////////////---------------------SUBSCRIBER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
+void *connect_subscriber(void *arg);
+void receive_topic();
+void sub_unregister();
