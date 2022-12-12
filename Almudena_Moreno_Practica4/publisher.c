@@ -46,6 +46,8 @@ int main (int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
         }
     }
+    
+    signal(SIGINT, ctrlHandlerClient);   //Close with CTRL + C
 
     read_or_write(ip, port, topic, "publisher");
 

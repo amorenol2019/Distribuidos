@@ -50,6 +50,7 @@ int main (int argc, char *argv[]) {
     if ((strcmp(mode, "secuencial") != 0) && (strcmp(mode, "paralelo") != 0) && (strcmp(mode, "justo") != 0)) {
         error(RED USAGE RESET_COLOR);
     }
+    signal(SIGINT, ctrlHandlerBroker);   //Close with CTRL + C
 
     communicate_server(port);
     recv_client();

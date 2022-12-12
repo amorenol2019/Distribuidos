@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <time.h>
+#include <signal.h>
 
 #define RED "\x1b[31m"
 #define RESET_COLOR    "\x1b[0m"
@@ -49,6 +50,7 @@ struct n_topic {
     int sub;
     struct Node* first;
     struct Node* last;
+    int num_node;
 };
 
 struct Node {
@@ -61,30 +63,31 @@ struct Node {
 void error(char *message);
 void take_time();
 
+void print_list_node();
+
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_server (unsigned int port);
 void communicate_server(unsigned int port);
 
 void recv_client();
 void *communicate_client(void *arg);
-int exists(char topic[100], char* type, int fd);
+int exists(char topic[100], char* type, int fd, int counter_id);
 void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type);
 void print_list_topics(char* topic, char* type);
 void unregister_publisher(struct message receive, char* type);
 void receive_data(struct message receive);
-void sending_data(int connfd_topic, struct message publish);
+void sending_data(struct message publish);
 
 int close_server();
 
-void ctrlHandlerBroker(int num);
+void ctrlHandlerBroker();
 
 /*////////////////////////////---------------------CLIENTS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void set_ip_port ();
 int create_socket();
 void read_or_write(char* ip_client, int port_client, char topic[], char* mode);
+void ctrlHandlerClient();
 int close_client();
-
-//void ctrlHandler(int num);
 
 /*////////////////////////////---------------------PUBLISHER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void open_fd(char mode[2]);

@@ -46,16 +46,10 @@ int main (int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
         }
     }
+    
+    signal(SIGINT, ctrlHandlerClient);   //Close with CTRL + C
 
     read_or_write(ip, port, topic, "subscriber");
-
-
-    /*
-    if ((strcmp(mode, "secuencial") != 0) && (strcmp(mode, "paralelo") != 0) && (strcmp(mode, "justo") != 0)) {
-        error(RED USAGE RESET_COLOR);
-    }
-    */
-
 
     return 0;
 }
