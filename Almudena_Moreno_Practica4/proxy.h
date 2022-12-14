@@ -61,8 +61,7 @@ struct Node {
 
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void error(char *message);
-void take_time();
-
+struct timespec take_time(char* option);
 void print_list_node();
 
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
