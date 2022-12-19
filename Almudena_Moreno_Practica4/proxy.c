@@ -27,9 +27,12 @@ struct sockaddr_in sock_serv;
 
 //SERVER VARIABLES
 int connfd, counter_pub = 0, counter_sub = 0, counter_topics = 0;
-
+char* broker_mode;
 struct n_topic topics[MAX_LIMIT_TOPICS];
-//struct n_sub_pub count_topic[MAX_LIMIT_TOPICS];
+
+pthread_mutex_t mutex_limit;
+pthread_cond_t  limit_max;
+pthread_barrier_t barrier;
 
 //CLIENT VARIABLES
 int sock_cli, port_c;
@@ -60,8 +63,10 @@ struct timespec take_time(char* option){
     return wait_time_init;
 }
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_server (unsigned int port) {
+void set_server (unsigned int port, char* mode) {
     srand(time(NULL));
+
+    broker_mode = mode;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -74,10 +79,10 @@ void set_server (unsigned int port) {
     sock_serv.sin_port = htons(port);
 }
 
-void communicate_server(unsigned int port) {
+void communicate_server(unsigned int port, char* mode) {
     const int enable = 1;
 
-    set_server(port);
+    set_server(port, mode);
 
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0) {
         close_server();
@@ -105,182 +110,6 @@ void recv_client() {
             error("Failed server accept...");
         } else {
             pthread_create(&c_server, NULL, &communicate_client, &connfd);
-        }
-    }
-}
-
-/*
--------------------
-AÑADIR NODE LAST v/ el mismo
-AÑADIR NOMBRE TOPIC v/
--------------------
-*/
-int exists(char topic[100], char* type, int fd, int counter_id) {
-    int return_value = 1;
-    printf("Resumen: \n");
-    for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(topic, topics[i].name) == 0) {
-            return_value = 0;
-            if (strcmp(type, "Publicador") == 0) {
-                topics[i].pub++;
-            } else if (strcmp(type, "Suscriptor") == 0) {
-                struct Node *t_node = (struct Node *) malloc(sizeof(struct Node));
-                t_node->id = counter_id;
-                t_node->fd = fd;
-                t_node->next = NULL;  
-
-                if (topics[i].sub == 0) {  //If there are no sub, does not exist first and last
-                    topics[i].first = t_node;
-                    topics[i].last = t_node;
-                } else {
-                    topics[i].last->next = t_node;
-                    topics[i].last = t_node;
-                }
-                topics[i].sub++;
-                topics[i].num_node++;
-            }
-
-        }
-        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
-    }
-
-    return return_value;
-}
-
-int free_topic() {
-    for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(topics[i].name, "NULL") == 0) {
-            return i;
-        }
-    }
-
-    return counter_topics;
-}
-
-void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type) {
-    struct response msg_response;
-
-    printf("(%d) %s conectado : %s\n", counter, type, msg_recv.topic);
-
-    //Topic does not exist and there are enough free n topics
-    if (exists(msg_recv.topic, type, connfd_send, counter) == 1 && counter_topics < MAX_LIMIT_TOPICS) {
-        struct n_topic new_topic;
-        sprintf(new_topic.name, "%s", msg_recv.topic);
-        if (strcmp(type, "Publicador") == 0) {
-            new_topic.pub = 1;
-            new_topic.sub = 0;
-            new_topic.num_node = 0;
-        } else if (strcmp(type, "Suscriptor") == 0) {
-            new_topic.pub = 0;
-            new_topic.sub = 1;
-
-            struct Node *t_node = (struct Node *) malloc(sizeof(struct Node));
-            t_node->id = counter;
-            t_node->fd = connfd_send;
-            t_node->next = NULL;
-
-            new_topic.first = t_node;
-            new_topic.last = t_node;
-            new_topic.num_node = 1;
-        }
-
-        topics[free_topic()] = new_topic;
-
-        printf("%s: %d Suscriptores - %d Publicadores\n", msg_recv.topic, topics[counter_topics].sub, topics[counter_topics].pub);
-        counter_topics++;
-    }
-
-    if (counter == limit - 1) {
-        msg_response.response_status = LIMIT;
-    } else {
-        msg_response.response_status = OK;
-    }
-    msg_response.id = counter;
-    if (send(connfd_send, &msg_response, sizeof(msg_response), 0) < 0) {
-        error("Send to server failed...\n");
-    }
-}
-
-void print_list_topics(char* topic, char* type) {
-    printf("Resumen: \n");
-    for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(topic, topics[i].name) == 0) {
-            if (strcmp(type, "Publicador") == 0) {
-                topics[i].pub--;
-            } else if (strcmp(type, "Suscriptor") == 0) {
-                topics[i].sub--;
-            }
-        }
-        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
-    }
-}
-
-void unregister(struct message receive, char* type) {
-    if (strcmp(type, "Suscriptor") == 0) {
-        //Eliminar nodo
-        int deleted = 0;
-        for (int i = 0; i < counter_topics; i++) {
-            if (strcmp(receive.topic, topics[i].name) == 0) {
-                struct Node* current_node = topics[i].first;
-                if (current_node->id == receive.id) {
-                    topics[i].first = current_node->next;
-                    //topics[i].sub--;
-                    topics[i].num_node--;
-                    deleted = 1;
-                    free(current_node);
-                } else {
-                    struct Node* node_to_delete = current_node->next;
-                    for (int j = 0; j < topics[i].num_node - 1; j++) {
-                        if(node_to_delete->id == receive.id) {
-                            //eliminar nodo
-                            //topics[i].sub--;
-                            topics[i].num_node--;
-                            deleted = 1;
-                            if (j == topics[i].num_node - 1) {
-                                current_node->next = NULL;
-                                topics[i].last = current_node;
-                            } else {
-                                //current_node->next->id = current_node->next->next->id;
-                                //current_node->next->fd = current_node->next->next->fd;
-                                current_node->next = node_to_delete->next;
-                            }
-                            free(node_to_delete);
-                            break;
-                        } else {
-                            current_node = node_to_delete;
-                            node_to_delete = node_to_delete->next;
-                        }
-                    }
-                }
-
-                if (deleted == 0) {
-                    error("This subscriber does not exist");
-                }
-            }
-        }
-    }
-
-    take_time("print");
-    printf(" Eliminado cliente (%d) %s : %s\n", receive.id, type, receive.topic);
-    print_list_topics(receive.topic, type);
-}
-
-void receive_data(struct message receive) {
-    char data[100];
-    struct timespec time;
-    take_time("print");
-    
-    strcpy(data, receive.data.data);
-    time = receive.data.time_generated_data;
-    printf(" Recibido mensaje para publicar en topic: %s -mensaje: %s - Generó: %ld.%ld\n", receive.topic, data, time.tv_sec, time.tv_nsec);
-    //sending_data(receive);
-}
-
-void delete_topic() {
-    for (int i = 0; i < counter_topics; i++) {
-        if ((topics[i].sub + topics[i].pub) == 0) {
-            sprintf(topics[i].name, "%s", "NULL");
-            counter_topics--;
         }
     }
 }
@@ -332,6 +161,89 @@ void *communicate_client(void *arg) {
     return 0;
 }
 
+int exists(char topic[100], char* type, int fd, int counter_id) {
+    int return_value = 1;
+    printf("Resumen: \n");
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(topic, topics[i].name) == 0) {
+            return_value = 0;
+            if (strcmp(type, "Publicador") == 0) {
+                topics[i].pub++;
+            } else if (strcmp(type, "Suscriptor") == 0) {
+                struct Node *t_node = (struct Node *) malloc(sizeof(struct Node));
+                t_node->id = counter_id;
+                t_node->fd = fd;
+                t_node->next = NULL;  
+
+                if (topics[i].sub == 0) {  //If there are no sub, does not exist first and last
+                    topics[i].first = t_node;
+                    topics[i].last = t_node;
+                } else {
+                    topics[i].last->next = t_node;
+                    topics[i].last = t_node;
+                }
+                topics[i].sub++;
+            }
+
+        }
+        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
+    }
+
+    return return_value;
+}
+
+int free_topic() {
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(topics[i].name, "NULL") == 0) {
+            return i;
+        }
+    }
+
+    return counter_topics;
+}
+
+void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type) {
+    struct response msg_response;
+
+    printf("(%d) %s conectado : %s\n", counter, type, msg_recv.topic);
+
+    //Topic does not exist and there are enough free n topics
+    if (exists(msg_recv.topic, type, connfd_send, counter) == 1 && counter_topics < MAX_LIMIT_TOPICS) {
+        struct n_topic new_topic;
+        sprintf(new_topic.name, "%s", msg_recv.topic);
+        if (strcmp(type, "Publicador") == 0) {
+            new_topic.pub = 1;
+            new_topic.sub = 0;
+        } else if (strcmp(type, "Suscriptor") == 0) {
+            new_topic.pub = 0;
+            new_topic.sub = 1;
+
+            struct Node *t_node = (struct Node *) malloc(sizeof(struct Node));
+            t_node->id = counter;
+            t_node->fd = connfd_send;
+            t_node->next = NULL;
+
+            new_topic.first = t_node;
+            new_topic.last = t_node;
+        }
+
+        topics[free_topic()] = new_topic;
+
+        printf("%s: %d Suscriptores - %d Publicadores\n", msg_recv.topic, topics[counter_topics].sub, topics[counter_topics].pub);
+        counter_topics++;
+    }
+
+    if (counter == limit - 1) {
+        msg_response.response_status = LIMIT;
+    } else {
+        msg_response.response_status = OK;
+    }
+    msg_response.id = counter;
+    if (send(connfd_send, &msg_response, sizeof(msg_response), 0) < 0) {
+        error("Send to server failed...\n");
+    }
+}
+
 /*
 void print_list_node() {
     for (int i = 0; i < counter_topics; i++) {
@@ -339,7 +251,7 @@ void print_list_node() {
         struct Node *node;
         node = topics[i].first;
         printf("    FIRST: \n  ID %d, FD, %d, next id,", node->id, node->fd);
-        for (int j = 0; j < topics[i].num_node - 1; j++) {
+        for (int j = 0; j < topics[i].sub - 1; j++) {
             printf("NODES \n");
             if (topics[i].sub == 1) {
                 printf("    ID %d, FD, %d", node->id, node->fd);
@@ -353,7 +265,37 @@ void print_list_node() {
     }
 }*/
 
+char* switch_status(enum status response_status) {
+    if (response_status == OK) {
+        return "OK";
+    } else if (response_status == LIMIT) {
+        return "LIMIT";
+    } else {
+        return "ERROR";
+    }
+}
+
+void receive_data(struct message receive) {
+    char data[100];
+    struct timespec time;
+    take_time("print");
+    
+    strcpy(data, receive.data.data);
+    time = receive.data.time_generated_data;
+    printf(" Recibido mensaje para publicar en topic: %s - mensaje: %s - Generó: %ld.%ld\n", receive.topic, data, time.tv_sec, time.tv_nsec);
+}
+
 void sending_data(struct message publish) {
+    if (strcmp(broker_mode, "secuencial") == 0)  {
+        sending_data_secuencial(publish);
+    } else if (strcmp(broker_mode, "paralelo") == 0) {
+        sending_data_parallel(publish);
+    } else if (strcmp(broker_mode, "justo") == 0) {
+        sending_data_parallel(publish);
+    }
+}
+
+void sending_data_secuencial(struct message publish) {
     struct publish msg_topic;
     struct n_topic topic_pub;
     
@@ -364,9 +306,9 @@ void sending_data(struct message publish) {
         }
     }
 
-    if (topic_pub.num_node == 0) {
+    if (topic_pub.sub == 0) {
         printf("There are no subscribers in this topic.\n");
-    } else if (topic_pub.num_node == 1){
+    } else if (topic_pub.sub == 1){
         struct Node *node;
         int connfd_topic;
         node = topic_pub.first;
@@ -382,7 +324,7 @@ void sending_data(struct message publish) {
         printf(" Enviando mensaje en topic %s a %d suscriptores.\n", topic_pub.name, topic_pub.sub);
         struct Node *node;
         node = topic_pub.first;
-        for (int i = 0; i < topic_pub.num_node; i++) {
+        for (int i = 0; i < topic_pub.sub; i++) {
             int connfd_topic = node->fd;
             msg_topic = publish.data;
             if (send(connfd_topic, &msg_topic, sizeof(msg_topic), 0) == -1) {
@@ -392,6 +334,129 @@ void sending_data(struct message publish) {
         }
     }
 
+}
+
+void sending_data_parallel(struct message publish) {
+    struct publish msg_topic;
+    struct n_topic topic_pub;
+    
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(publish.topic, topics[i].name) == 0) {
+            topic_pub = topics[i];
+            break;
+        }
+    }
+
+    if (topic_pub.sub == 0) {
+        printf("There are no subscribers in this topic.\n");
+    } else if (topic_pub.sub == 1){
+        take_time("print");
+        printf(" Enviando mensaje en topic %s a %d suscriptores.\n", topic_pub.name, topic_pub.sub);
+        pthread_t t_broker;
+        struct argThread parallel;
+        parallel.node = topic_pub.first;
+        parallel.msg_publish = publish.data;
+        pthread_create(&t_broker, NULL, &thread_one_sus, &parallel);
+
+    } else {
+        take_time("print");
+        printf(" Enviando mensaje en topic %s a %d suscriptores.\n", topic_pub.name, topic_pub.sub);
+        struct Node *node;
+        node = topic_pub.first;
+        for (int i = 0; i < topic_pub.sub; i++) {
+            pthread_t t_broker;
+            struct argThread parallel;
+            parallel.node = node;
+            parallel.msg_publish = publish.data;
+            node = node->next;
+            pthread_create(&t_broker, NULL, &thread_one_sus, &parallel);
+        }
+    }
+}
+
+void *thread_one_sus(void *arg) {
+    struct argThread parallel = *(struct argThread *)arg;
+    struct Node *node;
+    int connfd_topic;
+    struct publish msg_topic;
+    node = parallel.node;
+    connfd_topic = node->fd;
+    msg_topic = parallel.msg_publish;
+    
+    if (send(connfd_topic, &msg_topic, sizeof(msg_topic), 0) == -1) {
+        error("Send to server failed...\n");
+    }
+
+    return 0;
+}
+
+void print_list_topics(char* topic, char* type) {
+    printf("Resumen: \n");
+    for (int i = 0; i < counter_topics; i++) {
+        if (strcmp(topic, topics[i].name) == 0) {
+            if (strcmp(type, "Publicador") == 0) {
+                topics[i].pub--;
+            } else if (strcmp(type, "Suscriptor") == 0) {
+                topics[i].sub--;
+            }
+        }
+        printf("%s: %d Suscriptores - %d Publicadores\n", topics[i].name, topics[i].sub, topics[i].pub);
+    }
+}
+
+void unregister(struct message receive, char* type) {
+    if (strcmp(type, "Suscriptor") == 0) {
+        //Eliminar nodo
+        int deleted = 0;
+        for (int i = 0; i < counter_topics; i++) {
+            if (strcmp(receive.topic, topics[i].name) == 0) {
+                struct Node* current_node = topics[i].first;
+                if (current_node->id == receive.id) {
+                    topics[i].first = current_node->next;
+                    topics[i].sub--;
+                    deleted = 1;
+                    free(current_node);
+                } else {
+                    struct Node* node_to_delete = current_node->next;
+                    for (int j = 0; j < topics[i].sub - 1; j++) {
+                        if(node_to_delete->id == receive.id) {
+                            //eliminar nodo
+                            topics[i].sub--;
+                            deleted = 1;
+                            if (j == topics[i].sub - 1) {
+                                current_node->next = NULL;
+                                topics[i].last = current_node;
+                            } else {
+                                current_node->next = node_to_delete->next;
+                            }
+                            free(node_to_delete);
+                            break;
+                        } else {
+                            current_node = node_to_delete;
+                            node_to_delete = node_to_delete->next;
+                        }
+                    }
+                }
+
+                if (deleted == 0) {
+                    error("This subscriber does not exist");
+                }
+            }
+        }
+    }
+
+    take_time("print");
+    printf(" Eliminado cliente (%d) %s : %s\n", receive.id, type, receive.topic);
+    print_list_topics(receive.topic, type);
+}
+
+void delete_topic() {
+    for (int i = 0; i < counter_topics; i++) {
+        if ((topics[i].sub + topics[i].pub) == 0) {
+            sprintf(topics[i].name, "%s", "NULL");
+            counter_topics--;
+        }
+    }
 }
 
 /*
@@ -414,7 +479,6 @@ int close_server() {
 
     return 0;
 }
-
 
 void ctrlHandlerBroker() {
     close_server();
@@ -512,6 +576,7 @@ void close_fd() {
 }
 
 void *connect_publisher(void *arg) {
+    char* message;
     sock_cli = create_socket();
 
     if((connect(sock_cli, (struct sockaddr*)&sock, sizeof(sock))) == -1) {
@@ -532,10 +597,9 @@ void *connect_publisher(void *arg) {
         if (msg_resp.response_status == OK) {
             id_client = msg_resp.id;
             printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
-        } else if (msg_resp.response_status == LIMIT) {
-            //char* message;
-            //sprintf(message, " Error al hacer el registro: error=%s", msg_resp.response_status);
-            error(" Error al hacer el registro: error=%s");
+        } else { //if (msg_resp.response_status == LIMIT || msg_resp.response_status == ERROR)
+            sprintf(message, " Error al hacer el registro: error=%s", switch_status(msg_resp.response_status));
+            error(message);
         }
     }
     
@@ -544,7 +608,6 @@ void *connect_publisher(void *arg) {
         sleep(3);
     }
 
-    //pub_unregister();
     close_client();
 
     return 0;
@@ -608,7 +671,7 @@ void receive_topic() {
     long end_time = wait_current.tv_sec * 1e9 + wait_current.tv_nsec;
 
     latency = end_time - init_time;
-    printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: $time_received_data - Latencia: %f.\n", topic_client, msg_publisher.data, msg_publisher.time_generated_data.tv_sec, msg_publisher.time_generated_data.tv_nsec, latency);
+    printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: %ld.%ld - Latencia: %d.\n", topic_client, msg_publisher.data, msg_publisher.time_generated_data.tv_sec, msg_publisher.time_generated_data.tv_nsec, wait_current.tv_sec, wait_current.tv_nsec, latency);
 }   
 
 void sub_unregister() {
@@ -649,12 +712,11 @@ void *connect_subscriber(void *arg) {
             id_client = msg_resp.id;
             printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
         } else if (msg_resp.response_status == LIMIT) {
-            //char* message;
-            //sprintf(message, " Error al hacer el registro: error=%s", msg_resp.response_status);
-            error(" Error al hacer el registro: error=%s");
+            char* message;
+            sprintf(message, " Error al hacer el registro: %s", switch_status(msg_resp.response_status));
+            error(message);
         }
     }
-    
 
     while(1) {
         receive_topic();

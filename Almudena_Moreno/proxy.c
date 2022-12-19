@@ -20,7 +20,7 @@ int sock_cli[MAX_CLIENTS];
 int total_threads = 0;
 
 //OTHERS
-int sockfd = 0;
+int sockfd = 0, opened_f = 0;
 
 char fline[L_SIZE];
 FILE* file;
@@ -46,12 +46,16 @@ void open_fd(char mode[2]) {
     if ((file = fopen("server_output.txt", mode)) == NULL) {
         error("Error opening file");
     }
+    opened_f = 1;
 }
 
 void close_fd() {
-    if (fclose(file) == EOF) {
-        error("Error closing file");
+    if (opened_f == 1) {
+        if (fclose(file) == EOF) {
+            error("Error closing file");
+        }
     }
+    opened_f = 0;
 }
 
 void write_fd() {
@@ -158,8 +162,6 @@ void *communicate_client(void *arg) {
 
     connfd_ = accept(sockfd,(struct sockaddr *)NULL, NULL);
     if (connfd_ < 0) {
-        close(sockfd);
-        close(connfd_);
         error("Failed server accept...");
     }
         
@@ -326,15 +328,12 @@ void ctrlHandlerServer(int num) {
     close_server();
 
     close_fd();
-
+    
     pthread_mutex_destroy(&mutex_prior);
     pthread_mutex_destroy(&counter_mutex);
     pthread_mutex_destroy(&reader);
-
-    pthread_cond_destroy(&reader_cond);
-    pthread_cond_destroy(&writer_cond);
-    //sem_destroy(&sem_max_threads);
-    
+        
+    sem_destroy(&sem_max_threads);
 
     printf("\n");
     exit(EXIT_SUCCESS);
@@ -432,7 +431,7 @@ int close_client(int id){
 }
 
 void ctrlHandler(int num) {
-    close_client(serv_counter);
+    //close_client(serv_counter);
     printf("\n");
     exit(EXIT_SUCCESS);
 }

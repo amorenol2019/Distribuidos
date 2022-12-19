@@ -50,7 +50,6 @@ struct n_topic {
     int sub;
     struct Node* first;
     struct Node* last;
-    int num_node;
 };
 
 struct Node {
@@ -59,14 +58,18 @@ struct Node {
     struct Node* next;
 };
 
+struct argThread {
+    struct Node *node;
+    struct publish msg_publish;
+};
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 void error(char *message);
 struct timespec take_time(char* option);
 void print_list_node();
 
 /*////////////////////////////---------------------BROKER---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void set_server (unsigned int port);
-void communicate_server(unsigned int port);
+void set_server (unsigned int port, char* mode);
+void communicate_server(unsigned int port, char* mode);
 
 void recv_client();
 void *communicate_client(void *arg);
@@ -75,7 +78,14 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
 void print_list_topics(char* topic, char* type);
 void unregister_publisher(struct message receive, char* type);
 void receive_data(struct message receive);
+
 void sending_data(struct message publish);
+void sending_data_parallel(struct message publish);
+void sending_data_secuencial(struct message publish);
+void *thread_one_sus(void *arg);
+
+void unregister(struct message receive, char* type);
+void delete_topic();
 
 int close_server();
 

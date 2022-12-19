@@ -52,7 +52,7 @@ int main (int argc, char *argv[]) {
     }
     signal(SIGINT, ctrlHandlerBroker);   //Close with CTRL + C
 
-    communicate_server(port);
+    communicate_server(port, mode);
     recv_client();
     return 0;
 }
