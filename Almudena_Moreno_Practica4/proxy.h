@@ -63,7 +63,7 @@ struct argThread {
     struct publish msg_publish;
 };
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
-void error(char *message);
+void error(char* message);
 struct timespec take_time(char* option);
 void print_list_node();
 
