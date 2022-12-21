@@ -598,7 +598,7 @@ void *connect_publisher(void *arg) {
         if (msg_resp.response_status == OK) {
             id_client = msg_resp.id;
             printf(" Registrado correctamente con ID: %d para topic %s\n", msg_resp.id, msg_register.topic);
-        } else { //if (msg_resp.response_status == LIMIT || msg_resp.response_status == ERROR)
+        } else { 
             printf(" Error al hacer el registro: error=%s", switch_status(msg_resp.response_status));
             error("\n");
         }
@@ -667,8 +667,8 @@ void receive_topic() {
         printf("Send to server failed...\n");
     }
     wait_current = take_time("print");
-    long init_time =  msg_publisher.time_generated_data.tv_sec * 1e9 +  msg_publisher.time_generated_data.tv_nsec;
-    long end_time = wait_current.tv_sec * 1e9 + wait_current.tv_nsec;
+    long init_time =  msg_publisher.time_generated_data.tv_sec +  msg_publisher.time_generated_data.tv_nsec / 1e9;
+    long end_time = wait_current.tv_sec + wait_current.tv_nsec / 1e9;
 
     latency = end_time - init_time;
     printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: %ld.%ld - Latencia: %d.\n", topic_client, msg_publisher.data, msg_publisher.time_generated_data.tv_sec, msg_publisher.time_generated_data.tv_nsec, wait_current.tv_sec, wait_current.tv_nsec, latency);
