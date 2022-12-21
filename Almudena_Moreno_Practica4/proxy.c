@@ -661,17 +661,15 @@ void pub_unregister() {
 void receive_topic() {
     struct publish msg_publisher;
     struct timespec wait_current;
-    int latency;
+    float latency;
 
     if (recv(sock_cli, (void *) &msg_publisher, sizeof(msg_publisher), 0) == -1) {
         printf("Send to server failed...\n");
     }
     wait_current = take_time("print");
-    long init_time =  msg_publisher.time_generated_data.tv_sec +  msg_publisher.time_generated_data.tv_nsec / 1e9;
-    long end_time = wait_current.tv_sec + wait_current.tv_nsec / 1e9;
+    latency =  (wait_current.tv_sec + wait_current.tv_nsec / 1e9) - (msg_publisher.time_generated_data.tv_sec +  msg_publisher.time_generated_data.tv_nsec / 1e9);
 
-    latency = end_time - init_time;
-    printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: %ld.%ld - Latencia: %d.\n", topic_client, msg_publisher.data, msg_publisher.time_generated_data.tv_sec, msg_publisher.time_generated_data.tv_nsec, wait_current.tv_sec, wait_current.tv_nsec, latency);
+    printf(" Recibido mensaje topic: %s - mensaje: %s - Generó: %ld.%ld - Recibido: %ld.%ld - Latencia: %f.\n", topic_client, msg_publisher.data, msg_publisher.time_generated_data.tv_sec, msg_publisher.time_generated_data.tv_nsec, wait_current.tv_sec, wait_current.tv_nsec, latency);
 }   
 
 void sub_unregister() {
