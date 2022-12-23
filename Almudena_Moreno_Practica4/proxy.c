@@ -11,7 +11,7 @@ NUNCA MUEREN, SOLO CUANDO HAGO CTRL+C
 
 #include "proxy.h"
 
-#define BACKLOG 2000
+#define BACKLOG 5000
 #define MAX_CLIENTS 1000
 #define MAX_LIMIT_PUB 100
 #define MAX_LIMIT_SUB 900
@@ -19,29 +19,29 @@ NUNCA MUEREN, SOLO CUANDO HAGO CTRL+C
 #define L_SIZE 2000
 
 //OTHERS
-int sockfd = 0, id_client;
-pthread_t client;
-char* topic_client;
-struct sockaddr_in sock;
-struct sockaddr_in sock_serv;
+int                 sockfd = 0, id_client;
+pthread_t           client;
+char*               topic_client;
+struct sockaddr_in  sock;
+struct sockaddr_in  sock_serv;
 
-//SERVER VARIABLES
-int connfd, counter_pub = 0, counter_sub = 0, counter_topics = 0;
-char* broker_mode;
-struct n_topic topics[MAX_LIMIT_TOPICS];
+//BROKER VARIABLES
+int                 connfd, counter_pub = 0;
+int                 counter_sub = 0, counter_topics = 0;
+char*               broker_mode;
+struct n_topic      topics[MAX_LIMIT_TOPICS];
 
-pthread_mutex_t mutex_limit, mutex_fd;
-pthread_cond_t  limit_max;
-pthread_barrier_t barrier;
+pthread_mutex_t     mutex_fd;
+pthread_barrier_t   barrier;
 
 //CLIENT VARIABLES
-int sock_cli, port_c;
-char *ip_c, *mode_c;
+int                 sock_cli, port_c;
+char                *ip_c, *mode_c;
 
 //PUBLISHER
-struct message msg_register;
-struct response msg_resp;
-FILE* file;
+struct message      msg_register;
+struct response     msg_resp;
+FILE*               file;
 
 /*////////////////////////////---------------------AUXILIAR FUNCTIONS---------------------\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*/
 
@@ -53,7 +53,7 @@ void error(char* message) {
 struct timespec take_time(char* option){
     struct timespec wait_time_init;
 
-    if (timespec_get(&wait_time_init, TIME_UTC) == -1) {
+    if (clock_gettime(CLOCK_REALTIME, &wait_time_init) == -1) {
         error("Error getting stamp of time");
     }
     if (strcmp(option, "print") == 0) {
@@ -202,7 +202,7 @@ int free_topic() {
 
 void send_message(int counter, struct message msg_recv, int limit, int connfd_send, char* type) {
     struct response msg_response;
-    if (counter_topics >= MAX_LIMIT_TOPICS || counter_sub >= MAX_LIMIT_SUB || counter_pub >= MAX_LIMIT_PUB) {
+    if (counter_topics > MAX_LIMIT_TOPICS || counter_sub > MAX_LIMIT_SUB || counter_pub > MAX_LIMIT_PUB) {
         msg_response.response_status = LIMIT;
         msg_response.id = 0;
     } else {
@@ -244,34 +244,14 @@ void send_message(int counter, struct message msg_recv, int limit, int connfd_se
 
 }
 
-/*
-void print_list_node() {
-    for (int i = 0; i < counter_topics; i++) {
-        printf("LIST OF NODES: \nTOPIC %s n_sub %d n_pub %d \n", topics[i].name, topics[i].sub, topics[i].pub);
-        struct Node *node;
-        node = topics[i].first;
-        printf("    FIRST: \n  ID %d, FD, %d, next id,", node->id, node->fd);
-        for (int j = 0; j < topics[i].sub - 1; j++) {
-            printf("NODES \n");
-            if (topics[i].sub == 1) {
-                printf("    ID %d, FD, %d", node->id, node->fd);
-            } else {
-                printf("   ID %d, FD, %d, next id, %d", node->id, node->fd, node->next->id);
-            }
-            node = node->next;
-            printf("\n");
-        }
-        printf("    LAST: \n  ID %d, FD, %d, next id,", topics[i].last->id, topics[i].last->fd);
-    }
-}*/
-
 char* switch_status(enum status response_status) {
-    if (response_status == OK) {
-        return "OK";
-    } else if (response_status == LIMIT) {
-        return "LIMIT";
-    } else {
-        return "ERROR";
+    switch (response_status) {
+        case OK :
+            return "OK";
+        case LIMIT :
+            return "LIMIT";
+        default :
+            return "ERROR";
     }
 }
 
@@ -286,25 +266,25 @@ void receive_data(struct message receive) {
 }
 
 void sending_data(struct message publish) {
-    if (strcmp(broker_mode, "secuencial") == 0)  {
-        sending_data_secuencial(publish);
-    } else if (strcmp(broker_mode, "paralelo") == 0) {
-        sending_data_parallel(publish);
-    } else if (strcmp(broker_mode, "justo") == 0) {
-        sending_data_parallel(publish);
-    }
-}
-
-void sending_data_secuencial(struct message publish) {
-    struct publish msg_topic;
     struct n_topic topic_pub;
-    
+
     for (int i = 0; i < counter_topics; i++) {
         if (strcmp(publish.topic, topics[i].name) == 0) {
             topic_pub = topics[i];
             break;
         }
     }
+    if (strcmp(broker_mode, "secuencial") == 0)  {
+        sending_data_secuencial(publish, topic_pub);
+    } else if (strcmp(broker_mode, "paralelo") == 0) {
+        sending_data_parallel(publish, topic_pub);
+    } else if (strcmp(broker_mode, "justo") == 0) {
+        sending_data_parallel(publish, topic_pub);
+    }
+}
+
+void sending_data_secuencial(struct message publish, struct n_topic topic_pub) {
+    struct publish msg_topic;
 
     if (topic_pub.sub == 0) {
         printf("There are no subscribers in this topic.\n");
@@ -336,21 +316,8 @@ void sending_data_secuencial(struct message publish) {
 
 }
 
-/*
-El monotone empieza en 0 cuando se inicia el ordenador
-Dentro de un mismo pc, en tiempos muy justos
-*/
-
-void sending_data_parallel(struct message publish) {
+void sending_data_parallel(struct message publish, struct n_topic topic_pub) {
     struct publish msg_topic;
-    struct n_topic topic_pub;
-    
-    for (int i = 0; i < counter_topics; i++) {
-        if (strcmp(publish.topic, topics[i].name) == 0) {
-            topic_pub = topics[i];
-            break;
-        }
-    }
 
     if (topic_pub.sub == 0) {
         printf("There are no subscribers in this topic.\n");
@@ -359,14 +326,18 @@ void sending_data_parallel(struct message publish) {
         printf(" Enviando mensaje en topic %s a %d suscriptores.\n", topic_pub.name, topic_pub.sub);
         if (strcmp(broker_mode, "justo") == 0) {
             pthread_barrier_init(&barrier, NULL, topic_pub.sub);
-        }   
+        }
         pthread_t t_broker;
         struct argThread parallel;
         parallel.node = topic_pub.first;
         parallel.msg_publish = publish.data;
         pthread_create(&t_broker, NULL, &thread_one_sus, &parallel);
-
+        if(pthread_join(t_broker, NULL) != 0){
+            error( "Error executing pthread_join \n");
+        }
     } else {
+        pthread_t t_broker[topic_pub.sub];
+
         take_time("print");
         printf(" Enviando mensaje en topic %s a %d suscriptores.\n", topic_pub.name, topic_pub.sub);
         if (strcmp(broker_mode, "justo") == 0) {
@@ -375,13 +346,10 @@ void sending_data_parallel(struct message publish) {
         struct Node *node;
         node = topic_pub.first;
         for (int i = 0; i < topic_pub.sub; i++) {
-            pthread_mutex_lock(&mutex_fd);
-            pthread_t t_broker;
             struct argThread* parallel = (struct argThread *) malloc(sizeof(struct argThread));
             parallel->node = node;
             parallel->msg_publish = publish.data;
-            pthread_create(&t_broker, NULL, &thread_one_sus, parallel);
-            pthread_mutex_unlock(&mutex_fd);
+            pthread_create(&t_broker[i], NULL, &thread_one_sus, parallel);
             node = node->next;
         }
     }
@@ -625,7 +593,7 @@ void send_publisher() {
     message[strcspn(message, "\n")] = 0;
     close_fd();
     
-    timespec_get(&publish_time, TIME_UTC);
+    clock_gettime(CLOCK_REALTIME, &publish_time);
 
     msg_publisher.action = PUBLISH_DATA;
     strcpy(msg_publisher.topic, topic_client);

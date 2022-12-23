@@ -20,7 +20,7 @@ def get_data(file, mode, n_subs):
     data = str(mode) + ", " + str(n_subs) + ", " + str(np.max(latency)) + ", " + str(np.min(latency)) + ", " + str(np.mean(latency)) + ", " + str(np.std(latency)) + "\n"
 
     fichero_csv.write(data)
-
+paralelo_10 = "paralelo_10.txt"
 secuencial_50 = "secuencial_50.txt"
 secuencial_500 = "secuencial_500.txt"
 secuencial_900 = "secuencial_900.txt"
@@ -31,19 +31,18 @@ justo_50 = "justo_50.txt"
 justo_500 = "justo_500.txt"
 justo_900 = "justo_900.txt"
 
+
 get_data(secuencial_50, secuencial, 50)
 get_data(secuencial_500, secuencial, 500)
-
-"""
 get_data(secuencial_900, secuencial, 900)
-
+fichero_csv.write("\n")
 get_data(paralelo_50, paralelo, 50)
 get_data(paralelo_500, paralelo, 500)
-
-
 get_data(paralelo_900, paralelo, 900)
-
+fichero_csv.write("\n")
 get_data(justo_50, justo, 50)
 get_data(justo_500, justo, 500)
 get_data(justo_900, justo, 900)
+
+"""
 """

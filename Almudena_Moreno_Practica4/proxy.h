@@ -80,8 +80,8 @@ void unregister_publisher(struct message receive, char* type);
 void receive_data(struct message receive);
 
 void sending_data(struct message publish);
-void sending_data_parallel(struct message publish);
-void sending_data_secuencial(struct message publish);
+void sending_data_secuencial(struct message publish, struct n_topic topic_pub);
+void sending_data_parallel(struct message publish, struct n_topic topic_pub);
 void *thread_one_sus(void *arg);
 
 void unregister(struct message receive, char* type);

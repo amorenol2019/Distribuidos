@@ -1,8 +1,8 @@
 #!/bin/sh
 
-for i in `seq 1 500`; do
-    (./subscriber --ip 127.0.0.1 --port 8080 --topic A | grep 'Latencia: ' | cut -d: -f6 | sed 's/.$//g' | tee -a secuencial_500_$i.txt )&
-    sleep 0.001
+for i in `seq 1 10`; do
+    (./subscriber --ip 127.0.0.1 --port 8080 --topic A | grep 'Latencia: ' | cut -d: -f6 | sed 's/.$//g' | tee -a justo_900_$i.txt )&
+    sleep 0.1
 
     #(./subscriber --ip 127.0.0.1 --port 8080 --topic A | grep 'Latencia: ' | cut -d: -f6 | sed 's/.$//g' | tee -a secuencial_50_$i.txt )&
     #(./subscriber --ip 127.0.0.1 --port 8080 --topic A | grep 'Latencia: ' | cut -d: -f6 | sed 's/.$//g' | tee -a secuencial_900_$i.txt )&
